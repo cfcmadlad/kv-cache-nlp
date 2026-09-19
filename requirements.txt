@@ -1,5 +1,5 @@
-torch
-datasets
-tokenizers
-numpy
-tqdm
+torch  # install separately per README (CPU-only by default) -- tested with 2.9.0
+datasets>=2.19
+tokenizers>=0.19
+numpy>=1.24
+tqdm>=4.65
