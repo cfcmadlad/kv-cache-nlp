@@ -17,10 +17,14 @@ import argparse
 import hashlib
 import json
 import re
+import sys
 import unicodedata
 from pathlib import Path
 
-from datasets import load_dataset
+try:
+    from datasets import load_dataset
+except ImportError:
+    sys.exit("prepare_data.py needs the datasets package (the demo does not). Run: pip install datasets")
 
 WIKITEXT_HEADER_RE = re.compile(r"^\s*=\s([^=].*?)\s=\s*$")
 WIKITEXT_ARTIFACT_RE = re.compile(r" @([-,.])@ ")

@@ -1,4 +1,8 @@
-torch>=2.0  # install first with the CPU or CUDA command from the README Quickstart (tested with 2.9.0)
+# Packages the demo and the training scripts need. Install PyTorch first with the CPU or CUDA
+# command from the README (or let run.bat / run.sh do everything); tested with torch 2.9.0 and 2.14.1.
+torch>=2.0
+numpy>=1.24  # used inside PyTorch; without it torch prints a warning on every import
 tokenizers>=0.19
 tqdm>=4.65
-datasets>=2.19  # only needed to rebuild data/processed/ from scratch with prepare_data.py
+# Only scripts/prepare_data.py (rebuilding data/processed/ from scratch) also needs:
+#   pip install datasets

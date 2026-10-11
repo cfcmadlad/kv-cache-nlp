@@ -4,6 +4,10 @@ Option 1 trains a baseline live on a 3,000-document subset by running the real t
 script with small settings, so the examiner sees genuine progress output.
 Option 2 prints the comparison table of the full-scale trained models (bpb_harness.py).
 Option 3 loads a full-scale model, scores a sentence you type and continues it.
+Option 4 re-scores the evaluation sets and checks the six reported numbers (check_setup.py --full).
+
+On the first run it gets the trained models and data itself (see ensure_assets), so a
+fresh copy of the code needs only this one command.
 
 Usage:
     python scripts/demo.py
@@ -15,6 +19,7 @@ from pathlib import Path
 
 import torch
 
+from check_setup import REQUIRED_FILES
 from data_utils import load_ngram, load_transformer, safe_print
 from train_bpe_transformer import per_document_bpb
 
@@ -23,6 +28,33 @@ CHECKPOINTS_DIR = REPO_ROOT / "checkpoints"
 # Live demo runs write here, never to checkpoints/ itself: an early demo run once
 # overwrote a real checkpoint that had the same filename.
 DEMO_CHECKPOINTS_DIR = "checkpoints/demo"
+ASSET_ZIP_NAME = "kv-cache-nlp-part2-assets.zip"
+
+
+def ensure_assets() -> bool:
+    """Get the trained models and data on the first run; return False if that failed.
+
+    The submitted code contains no data, so a fresh copy has none. A copy of the release zip
+    found in the code folder, one or two folders above it, or the Downloads folder is used
+    offline; otherwise fetch_assets.py downloads it from GitHub."""
+    missing = [f for f in REQUIRED_FILES if not (REPO_ROOT / f).exists()]
+    if not missing:
+        return True
+    print(f"First run: the trained models and data are not here yet ({len(missing)} files missing).")
+    fetch = [sys.executable, "scripts/fetch_assets.py"]
+    # Two levels up because Windows "Extract All" adds a folder named after the zip.
+    for folder in (REPO_ROOT, REPO_ROOT.parent, REPO_ROOT.parent.parent, Path.home() / "Downloads"):
+        local_zip = folder / ASSET_ZIP_NAME
+        if local_zip.is_file():
+            print(f"Using the local copy {local_zip}\n")
+            sys.stdout.flush()  # so these lines appear before fetch_assets.py's own output
+            if subprocess.run(fetch + ["--zip", str(local_zip)], cwd=REPO_ROOT, check=False).returncode == 0:
+                return True
+            print("\nThat copy did not work (see above), so trying GitHub instead.")
+            break
+    print("Downloading them from GitHub (138 MB, one time only; needs internet).\n")
+    sys.stdout.flush()
+    return subprocess.run(fetch, cwd=REPO_ROOT, check=False).returncode == 0
 
 
 def ask(prompt: str, choices: list) -> str:
@@ -66,6 +98,13 @@ def show_comparison():
     if result.returncode != 0:
         print(f"\n  Could not build the comparison (exit code {result.returncode}). "
               "Run python scripts/fetch_assets.py to get the trained models.")
+
+
+def verify_numbers():
+    """Option 4: re-score the evaluation sets and check the six reported BPB values."""
+    print("\nRe-scoring the evaluation sets from the trained models (under a minute on a GPU)...\n")
+    sys.stdout.flush()
+    subprocess.run([sys.executable, "scripts/check_setup.py", "--full"], cwd=REPO_ROOT, check=False)
 
 
 def ngram_score_and_continue(model, text: str) -> tuple:
@@ -122,12 +161,16 @@ def explore_model():
 
 
 def main():
+    if not ensure_assets():
+        # A non-zero exit makes run.bat keep its window open so this message can be read.
+        sys.exit("\nCould not get the trained models and data; see the message above.")
     while True:
         print("\n=== kv-cache-nlp baseline demo ===")
         print("1) Train a model live (quick demo run)")
         print("2) Show real baseline comparison (BPB harness)")
         print("3) Explore a trained model (score your text / see it generate)")
-        print("4) Quit")
+        print("4) Verify the reported numbers (re-scores the evaluation sets)")
+        print("5) Quit")
         choice = input("> ").strip()
 
         if choice == "1":
@@ -137,9 +180,11 @@ def main():
         elif choice == "3":
             explore_model()
         elif choice == "4":
+            verify_numbers()
+        elif choice == "5":
             return
         else:
-            print("  Please enter 1, 2, 3, or 4.")
+            print("  Please enter 1, 2, 3, 4 or 5.")
 
 
 if __name__ == "__main__":

@@ -51,8 +51,8 @@ about four times longer for the same text. Part 3 is about deciding which of tho
 Examiners may want evidence that the numbers came from running this code, not from a generated
 write-up. Each of these takes under a minute and can be done live:
 
-1. **Re-derive the headline numbers from the weights.** `python scripts/check_setup.py --full`
-   loads the four released models and re-scores the evaluation documents from scratch. All six
+1. **Re-derive the headline numbers from the weights.** Demo option 4 (or
+   `python scripts/check_setup.py --full`) loads the four released models and re-scores the evaluation documents from scratch. All six
    reported BPB values come out again to four decimals (about 30 seconds on a GPU, 2 minutes on a CPU).
 2. **Regenerate a committed report.** Run `python scripts/error_analysis.py --dataset wikitext103`,
    which rewrites `eval/error_analysis_wikitext103.md` from the models, then `git status`: the file
@@ -159,6 +159,11 @@ write-up. Each of these takes under a minute and can be done live:
 
 - **Is the live training real?** Yes, it runs the same training scripts as a subprocess with
   smaller settings (3,000 documents, 300 steps, vocabulary 2,000 for the Transformer).
+- **What does `run.bat` / `run.sh` do?** Finds Python 3.10+ (installing it if missing). If that
+  Python already has PyTorch it is used as is; otherwise one shared environment is created in the
+  user folder and PyTorch (GPU build if `nvidia-smi` works, else CPU) and `requirements.txt` are
+  installed into it, once. Then it starts the demo, which fetches the models and data on its first
+  run. The submitted code has no data, so this is how a fresh copy becomes runnable.
 - **Can the demo damage the results?** No. Live runs write to `checkpoints/demo/`; options 2 and 3
   only read.
 - **Why does a short phrase get an absurdly low BPB in option 3?** The Transformer never predicts

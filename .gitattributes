@@ -8,6 +8,10 @@
 *.jsonl text
 *.html text
 
+# Windows batch files need CRLF line endings; shell scripts need LF.
+*.bat text eol=crlf
+*.sh text eol=lf
+
 *.pt binary
 *.pkl binary
 *.zip binary

@@ -21,27 +21,102 @@ is recomputed from the released files by `python scripts/check_setup.py --full`.
 
 ## Contents
 
-1. [Quickstart](#quickstart)
-2. [Demo in 30 minutes](#demo-in-30-minutes)
-3. [What the release contains](#what-the-release-contains)
-4. [The project in brief](#the-project-in-brief)
-5. [Data](#data)
-6. [Classical baseline: Kneser-Ney byte 4-gram](#classical-baseline-kneser-ney-byte-4-gram)
-7. [Modern baseline: BPE Transformer](#modern-baseline-bpe-transformer)
-8. [Evaluation: bits per byte](#evaluation-bits-per-byte)
-9. [Results](#results)
-10. [Repository map](#repository-map)
-11. [Reproducing every number from scratch](#reproducing-every-number-from-scratch)
-12. [Design decisions and lessons](#design-decisions-and-lessons)
-13. [Troubleshooting](#troubleshooting)
-14. [Next: Part 3](#next-part-3)
+1. [Demo day, step by step](#demo-day-step-by-step)
+2. [Quickstart](#quickstart)
+3. [Demo in 30 minutes](#demo-in-30-minutes)
+4. [What the release contains](#what-the-release-contains)
+5. [The project in brief](#the-project-in-brief)
+6. [Data](#data)
+7. [Classical baseline: Kneser-Ney byte 4-gram](#classical-baseline-kneser-ney-byte-4-gram)
+8. [Modern baseline: BPE Transformer](#modern-baseline-bpe-transformer)
+9. [Evaluation: bits per byte](#evaluation-bits-per-byte)
+10. [Results](#results)
+11. [Repository map](#repository-map)
+12. [Reproducing every number from scratch](#reproducing-every-number-from-scratch)
+13. [Design decisions and lessons](#design-decisions-and-lessons)
+14. [Troubleshooting](#troubleshooting)
+15. [Next: Part 3](#next-part-3)
+
+## Demo day, step by step
+
+The evaluation asks us to download our code from LMS and run it. The code on LMS contains no
+data, so the trained models and data come from our GitHub release (or a USB copy). Do the
+"before" steps on the laptop you will present from; then the evaluation itself is one command.
+
+**The day before (one time, needs internet, 10 to 30 minutes):**
+
+1. Download our code zip from LMS and unzip it. You get a folder called `kv-cache-nlp` (Windows
+   "Extract All" puts it inside a folder named after the zip; that is fine).
+2. Also download `kv-cache-nlp-part2-assets.zip` (138 MB) from the
+   [release page](https://github.com/cfcmadlad/kv-cache-nlp/releases/tag/v0.2-part2) into your
+   Downloads folder, and copy it to a USB drive as a backup.
+3. Open a terminal in the `kv-cache-nlp` folder and run `.\run.bat` (Windows) or `bash run.sh`
+   (Linux, macOS). The first run installs Python if needed, then PyTorch and the other packages,
+   unpacks the models and data, and opens the demo menu. Type `5` to quit.
+4. Run it once more to confirm it now opens the menu within seconds.
+
+**At the evaluation (a few minutes):**
+
+1. Download the code zip from LMS as instructed and unzip it.
+2. Open a terminal in the new `kv-cache-nlp` folder and run `.\run.bat` (Windows) or
+   `bash run.sh` (Linux, macOS). Everything installed the day before is reused, and the models
+   and data are unpacked from the zip in your Downloads folder (or a copy from the USB drive
+   placed in the `kv-cache-nlp` folder), so this takes seconds and needs no internet.
+3. In the menu, show training first: `1`, then `tinystories`, then `ngram` (about 10 seconds), or
+   `transformer` on a laptop with an NVIDIA GPU (about 2 minutes). While it runs, open
+   `docs\bpb_explorer.html` in a browser.
+4. Show the results: `2` prints the comparison table of the full models.
+5. Show the models working: `3`, pick a dataset and a model, and type a full sentence; it prints
+   the bits per byte and continues the text. Press Enter on an empty line to go back.
+6. If asked to prove the numbers are real: `4` re-scores the evaluation sets from the trained
+   models and checks all six reported results (under a minute on a GPU, about two on a CPU).
+7. `5` quits.
+
+More detail on each demo option is in [Demo in 30 minutes](#demo-in-30-minutes).
 
 ## Quickstart
 
-You need Python 3.10 or newer (tested with 3.13.7) and Git. A GPU is optional: everything,
-including the demo, runs on a CPU.
+### One command
 
-The steps are the same on every platform. Only the virtual-environment activation differs.
+Get the code (unzip the copy from LMS, or `git clone` this repository), open a terminal in the
+`kv-cache-nlp` folder, and run one command.
+
+Windows (PowerShell or Command Prompt; or double-click `run.bat` in File Explorer):
+
+```powershell
+.\run.bat
+```
+
+Linux and macOS:
+
+```bash
+bash run.sh
+```
+
+That command does everything, skipping whatever is already done:
+
+1. Finds Python 3.10 or newer. If there is none, it installs Python 3.12 (with `winget` on
+   Windows, Homebrew on macOS, `apt` on Debian or Ubuntu, which asks for your password).
+2. Uses that Python directly if it already has PyTorch. Otherwise it creates one Python
+   environment in your user folder (`%LOCALAPPDATA%\kv-cache-nlp\venv` on Windows,
+   `~/.cache/kv-cache-nlp/venv` elsewhere) and installs PyTorch there, the GPU build if an NVIDIA
+   GPU is present and the CPU build otherwise, plus the packages in `requirements.txt`. Because
+   the environment is outside the code folder, a fresh copy of the code reuses it.
+3. Starts the demo. On its first run the demo gets the trained models and data: from
+   `kv-cache-nlp-part2-assets.zip` if it finds a copy in the `kv-cache-nlp` folder, one or two
+   folders above it, or your Downloads folder (offline, a few seconds), otherwise by downloading
+   it from GitHub.
+
+The first run needs internet and takes a while, mostly for PyTorch (about 2.5 GB for the GPU
+build); every later run starts the demo in seconds. If Python had to be installed on Windows, the
+script may ask you to open a new terminal and run it once more.
+
+### Step by step
+
+The same steps by hand. You need Python 3.10 or newer (tested with 3.13.7). A GPU is optional:
+everything, including the demo, runs on a CPU. The steps are the same on every platform; only the
+virtual-environment activation differs. If you start from the code zip instead of Git, skip the
+`git clone` and `cd` lines.
 
 **Windows (PowerShell)**
 
@@ -77,23 +152,20 @@ pip install torch --index-url https://download.pytorch.org/whl/cu126
 pip install torch --index-url https://download.pytorch.org/whl/cpu
 ```
 
-**Install the remaining packages, fetch the trained models, check, and start the demo.**
+**Install the remaining packages and start the demo.**
 
 ```bash
 pip install -r requirements.txt
 ```
 
 ```bash
-python scripts/fetch_assets.py
-```
-
-```bash
-python scripts/check_setup.py
-```
-
-```bash
 python scripts/demo.py
 ```
+
+That is all. On its first run the demo notices that the trained models and data are missing and
+gets them by running `scripts/fetch_assets.py` for you; later runs go straight to the menu. To
+confirm the setup without opening the demo, or to re-derive the reported numbers, run
+`python scripts/check_setup.py` (add `--full` for the numbers).
 
 How long each step takes. The clone, fetch and check rows were measured from a fresh clone of
 this repository on our laptop and home connection; the install rows are typical:
@@ -103,11 +175,11 @@ this repository on our laptop and home connection; the install rows are typical:
 | `git clone` | 2 seconds | The repository is under 1 MB. |
 | Create the virtual environment | about 10 seconds | |
 | Install PyTorch | several minutes | The CUDA wheel is about 2.5 to 3 GB, the CPU wheel about 200 MB. This is by far the slowest step, and it happens once. |
-| `pip install -r requirements.txt` | under a minute | Mostly the `datasets` package, which only `prepare_data.py` needs. |
-| `python scripts/fetch_assets.py` | about 75 seconds | Downloads the 138 MB zip from the GitHub release, verifies its SHA-256 and unpacks 219 MB. Mostly download time, so it depends on your connection. A stalled connection times out after 30 seconds and is retried up to three times. |
+| `pip install -r requirements.txt` | under a minute | numpy, tokenizers and tqdm; small. |
+| First run of `demo.py` (or `python scripts/fetch_assets.py`) | 1 to 7 minutes | Downloads the 138 MB zip from the GitHub release, verifies its SHA-256 and unpacks 219 MB. Almost all of it is download time: we measured 73 seconds once and 7 minutes on another run over the same connection, so do the first run well before a demo, or use a local copy of the zip (a few seconds). A stalled connection times out after 30 seconds and is retried up to three times. |
 | `python scripts/check_setup.py` | 5 to 10 seconds | Measured on both GPU and CPU. Loads all four models; no training. |
 
-With PyTorch already installed, clone to PASS took 85 seconds, almost all of it the download.
+With PyTorch already installed, clone to PASS took 85 seconds on our fastest run, almost all of it the download.
 
 When `check_setup.py` ends with `PASS`, you are ready for the review. If it prints `FAIL`, the
 message under it says what to run; see also [Troubleshooting](#troubleshooting).
@@ -162,6 +234,11 @@ The demo is a menu-driven program, `python scripts/demo.py`. A suggested running
    first token is a large share of the bytes: "Once upon a time" scores an unrealistic 0.010 BPB
    under the TinyStories Transformer. On a full sentence the effect is small, and on the
    evaluation sets it is under 0.6 percent.
+
+5. **Option 4: verify the reported numbers.** Runs `scripts/check_setup.py --full`: loads the four
+   released models, re-scores the 500 TinyStories, 60 WikiText-103 validation and 62 test
+   documents from scratch, and compares the six results with the reported values to four decimals.
+   It ends with `PASS`. This is the quickest answer to "did you really run this?".
 
 **If live training is slow on CPU.** On a laptop without an NVIDIA GPU, choose the n-gram on
 TinyStories in option 1: it finishes in about 10 seconds on any machine and shows real counting,
@@ -521,6 +598,7 @@ What the numbers say:
 kv-cache-nlp/
 ├── README.md                    this file
 ├── REVIEW_GUIDE.md              likely review questions with answers, and who explains what
+├── run.bat, run.sh              one-command setup and demo (Windows; Linux and macOS)
 ├── requirements.txt             Python packages (install PyTorch first, see Quickstart)
 ├── docs/
 │   └── bpb_explorer.html        offline viewer of per-byte costs for both models
@@ -538,6 +616,7 @@ kv-cache-nlp/
 
 | File | What it does | Produces |
 |---|---|---|
+| `run.bat`, `run.sh` | One-command launcher: finds or installs Python, reuses it if it has PyTorch or else sets up a shared environment with PyTorch and the requirements, then starts the demo. | a ready environment and the running demo |
 | `scripts/fetch_assets.py` | Downloads the release zip, verifies its SHA-256 and unpacks it, never overwriting different files without `--force`. Standard library only. | `checkpoints/`, `data/processed/` |
 | `scripts/check_setup.py` | Smoke test: PyTorch and CUDA, required files, loads all four models, scores one sentence, checks the parameter count and stored BPB values, prints the comparison table. `--full` re-scores the evaluation sets. | PASS or FAIL; with `--full`, the matched-document results table |
 | `scripts/prepare_data.py` | Downloads, cleans, deduplicates and splits both corpora. | `data/processed/*`; the dataset statistics table |
@@ -558,7 +637,12 @@ so every reported number can be traced to a command. Commands run from the repos
 in the order below. Times are for the RTX 4060 Laptop GPU used for the reported runs.
 
 **1. Build the processed data** (downloads both datasets from HuggingFace, a few gigabytes;
-the files are cached under your HuggingFace cache folder):
+the files are cached under your HuggingFace cache folder). This step needs one more package,
+which the demo does not:
+
+```bash
+pip install datasets
+```
 
 ```bash
 python scripts/prepare_data.py --dataset tinystories --max-docs 30000
@@ -652,6 +736,7 @@ overwrite the released files of the same name; copy them elsewhere first if you 
 | `CUDA available: False` on a machine with an NVIDIA GPU | The CPU build of PyTorch is installed. Reinstall with the CUDA command from the Quickstart. Everything still works on CPU. |
 | Garbled characters in the console on Windows | Cosmetic only. Run `chcp 65001` first for UTF-8 output. |
 | `Activate.ps1 cannot be loaded because running scripts is disabled` | `Set-ExecutionPolicy -Scope Process -ExecutionPolicy Bypass`, then activate again. |
+| `run.bat` stops while installing, or a script file disappears | An antivirus (Norton did this on our laptop) can stop installers started from a script. Open the antivirus history, allow the item, and run `.\run.bat` again. If it keeps failing, delete `%LOCALAPPDATA%\kv-cache-nlp\venv`, or install by hand with the step-by-step commands above. |
 | Option 1 transformer is slow | Expected on CPU. See [Demo in 30 minutes](#demo-in-30-minutes). |
 | `fetch_assets.py` says `Download failed (HTTP Error 404: Not Found)` | The release is not published yet, or the link changed. Check the [release page](https://github.com/cfcmadlad/kv-cache-nlp/releases), or get the zip from a teammate and use `--zip`. |
 | A training script says `train.jsonl has only 3,000 documents but ... were requested` | You are training on the truncated release file. Rebuild the data with `prepare_data.py` (see [Reproducing every number from scratch](#reproducing-every-number-from-scratch)), or pass `--max-train-docs 3000` or fewer. |
