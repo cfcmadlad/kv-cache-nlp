@@ -1,9 +1,9 @@
-"""Build a bits-per-byte comparison table across both baselines.
+"""Step 3: build the bits-per-byte comparison table for both baselines (demo option 2).
 
-Reads every checkpoints/*_results.json (written by train_ngram.py / train_bpe_transformer.py),
-groups by dataset, and prints + saves a comparison table. Both baselines write a flat schema
-sharing model/dataset/train_docs/val_docs/train_time_sec/train_bpb_sample/val_bpb -- see the
-"Baseline results schema" section of the README.
+Reads every checkpoints/*_results.json written by train_ngram.py and
+train_bpe_transformer.py, groups them by dataset, prints a Markdown table and saves it to
+eval/bpb_comparison.md. Each model reports on its own validation slice (see val_docs);
+check_setup.py --full gives the matched-document comparison.
 
 Usage:
     python scripts/bpb_harness.py
@@ -25,11 +25,9 @@ EXTRA_COLUMNS = {
 
 
 def load_results(checkpoints_dir: Path) -> list:
-    """One result dict per (model, dataset) pair. If a sweep left multiple results.json
-    for the same pair, keep the most recently written one and say so -- silently picking
-    an arbitrary file would make the comparison table nondeterministic. A single bad file
-    (e.g. left half-written by an interrupted run) is skipped with a warning rather than
-    taking down the whole comparison."""
+    """One result dict per (model, dataset) pair. If several files exist for a pair, the
+    most recently written one is used and a note is printed. Unreadable files are skipped
+    with a warning instead of stopping the whole table."""
     by_key = defaultdict(list)
     for path in sorted(checkpoints_dir.glob("*_results.json")):
         try:
@@ -50,14 +48,14 @@ def load_results(checkpoints_dir: Path) -> list:
 
 
 def _format_cell(value) -> str:
-    """Render one table cell -- comma-join lists (e.g. n-gram's discounts) instead of
-    Python's bracketed repr, and escape '|' so it can't be mistaken for a column separator."""
+    """Comma-join lists (the n-gram discounts) and escape '|' so it is not read as a column break."""
     if isinstance(value, list):
         value = ", ".join(str(v) for v in value)
     return str(value).replace("|", "\\|")
 
 
 def format_table(results: list) -> str:
+    """One Markdown table per dataset: shared columns first, then each model's extras."""
     datasets = sorted({r["dataset"] for r in results})
     lines = []
     for dataset in datasets:
@@ -72,7 +70,7 @@ def format_table(results: list) -> str:
         lines.append("| " + " | ".join(columns) + " |")
         lines.append("|" + "|".join(["---"] * len(columns)) + "|")
         for row in rows:
-            cells = [_format_cell(row.get(col, "—")) for col in columns]
+            cells = [_format_cell(row.get(col, "-")) for col in columns]
             lines.append("| " + " | ".join(cells) + " |")
         lines.append("")
     return "\n".join(lines)
@@ -80,13 +78,15 @@ def format_table(results: list) -> str:
 
 def main():
     parser = argparse.ArgumentParser(description=__doc__)
-    parser.add_argument("--checkpoints-dir", type=Path, default=Path("checkpoints"))
-    parser.add_argument("--out", type=Path, default=Path("eval"))
+    parser.add_argument("--checkpoints-dir", type=Path, default=Path("checkpoints"),
+                         help="folder with the *_results.json files")
+    parser.add_argument("--out", type=Path, default=Path("eval"), help="where to save bpb_comparison.md")
     args = parser.parse_args()
 
     results = load_results(args.checkpoints_dir)
     if not results:
-        print(f"No *_results.json found under {args.checkpoints_dir} -- train both baselines first.")
+        print(f"No *_results.json found in {args.checkpoints_dir}. "
+              "Run python scripts/fetch_assets.py, or train both baselines.")
         return
 
     table = format_table(results)

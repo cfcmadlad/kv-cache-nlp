@@ -1,0 +1,14 @@
+# Store text with LF line endings in the repository; Git converts on checkout as needed.
+* text=auto
+
+*.py text
+*.md text
+*.txt text
+*.json text
+*.jsonl text
+*.html text
+
+*.pt binary
+*.pkl binary
+*.zip binary
+*.png binary

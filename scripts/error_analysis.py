@@ -1,11 +1,10 @@
-"""Quantitative + qualitative error analysis comparing both baselines on the same val docs.
+"""Step 4: error analysis comparing both trained baselines on the same validation documents.
 
-Scores every val document with both models individually (not just the aggregate BPB the
-training scripts report), then reports:
-  - quantitative: per-model BPB distribution stats, and how the two models' per-doc
-    difficulty correlates (do they struggle on the same documents, or different ones?)
-  - qualitative: the actual worst/best-scoring documents per model, and the documents
-    where the two models disagree most -- concrete examples of what each model gets wrong
+Scores every document separately with both models, then writes eval/error_analysis_<dataset>.md:
+  - quantitative: per-document BPB statistics for each model, the correlation between the
+    two models' per-document scores, and mean BPB by document-length tercile
+  - qualitative: the worst and best scoring documents per model, and the documents where
+    the transformer gains most and least over the n-gram
 
 Usage:
     python scripts/error_analysis.py --dataset tinystories
@@ -23,6 +22,7 @@ PREVIEW_CHARS = 200
 
 
 def ngram_per_doc_bpb(model, texts: list) -> list:
+    """Bits per byte of each document under the n-gram model (nan for an empty one)."""
     scores = []
     for text in texts:
         doc = text.encode("utf-8")
@@ -31,6 +31,7 @@ def ngram_per_doc_bpb(model, texts: list) -> list:
 
 
 def distribution_stats(scores: list) -> dict:
+    """Count, mean, median, standard deviation, min and max, ignoring nan scores."""
     clean = [s for s in scores if s == s]  # drop NaN
     if not clean:
         return {"n": 0, "mean": float("nan"), "median": float("nan"),
@@ -46,6 +47,7 @@ def distribution_stats(scores: list) -> dict:
 
 
 def correlation(a: list, b: list) -> float:
+    """Pearson correlation of two per-document score lists over documents scored by both."""
     pairs = [(x, y) for x, y in zip(a, b) if x == x and y == y]
     if len(pairs) < 2:
         return float("nan")
@@ -79,6 +81,7 @@ def length_bucket_stats(texts: list, scores: list, num_buckets: int = 3) -> list
 
 
 def preview(text: str) -> str:
+    """First PREVIEW_CHARS characters of text on one line, for the report."""
     text = text.replace("\n", " ").strip()
     return text[:PREVIEW_CHARS] + ("..." if len(text) > PREVIEW_CHARS else "")
 
@@ -97,11 +100,9 @@ def worst_best_examples(texts: list, scores: list, n: int) -> dict:
     }
 
 
-def format_report(dataset: str, ngram_scores: list, transformer_scores: list,
-                   texts: list, num_examples: int) -> str:
-    lines = [f"# Error analysis: {dataset}\n"]
-
-    lines.append("## Quantitative\n")
+def quantitative_section(ngram_scores: list, transformer_scores: list, texts: list) -> list:
+    """Markdown lines: per-model BPB statistics, the correlation between models, BPB by length."""
+    lines = ["## Quantitative\n"]
     lines.append(f"Docs scored: {len(texts)}\n")
     lines.append("| | n-gram | transformer |")
     lines.append("|---|---|---|")
@@ -118,8 +119,13 @@ def format_report(dataset: str, ngram_scores: list, transformer_scores: list,
     lines.append("\n### BPB by document length (transformer)")
     for b in length_bucket_stats(texts, transformer_scores):
         lines.append(f"- {b['byte_range']} bytes ({b['docs']} docs): avg BPB {b['avg_bpb']}")
+    return lines
 
-    lines.append("\n## Qualitative\n")
+
+def qualitative_section(ngram_scores: list, transformer_scores: list, texts: list,
+                        num_examples: int) -> list:
+    """Markdown lines: best and worst documents per model, and where the models differ most."""
+    lines = ["\n## Qualitative\n"]
     for name, scores in [("n-gram", ngram_scores), ("transformer", transformer_scores)]:
         examples = worst_best_examples(texts, scores, num_examples)
         lines.append(f"### {name} -- worst-scoring docs (highest BPB, model most \"surprised\")")
@@ -140,19 +146,27 @@ def format_report(dataset: str, ngram_scores: list, transformer_scores: list,
     lines.append("\n### Where n-gram is relatively most competitive (smallest/negative improvement)")
     for imp, i in improvements[-num_examples:]:
         lines.append(f"- improvement {imp:.4f} bpb: {preview(texts[i])}")
+    return lines
 
+
+def format_report(dataset: str, ngram_scores: list, transformer_scores: list,
+                  texts: list, num_examples: int) -> str:
+    """The full Markdown report for one dataset."""
+    lines = [f"# Error analysis: {dataset}\n"]
+    lines += quantitative_section(ngram_scores, transformer_scores, texts)
+    lines += qualitative_section(ngram_scores, transformer_scores, texts, num_examples)
     return "\n".join(lines)
 
 
 def main():
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--dataset", choices=["tinystories", "wikitext103"], required=True)
-    parser.add_argument("--data-dir", type=Path, default=Path("data/processed"))
-    parser.add_argument("--checkpoints-dir", type=Path, default=Path("checkpoints"))
-    parser.add_argument("--out", type=Path, default=Path("eval"))
-    parser.add_argument("--eval-max-docs", type=int, default=300)
-    parser.add_argument("--num-examples", type=int, default=5)
-    parser.add_argument("--device", default="cpu")
+    parser.add_argument("--data-dir", type=Path, default=Path("data/processed"), help="processed data folder")
+    parser.add_argument("--checkpoints-dir", type=Path, default=Path("checkpoints"), help="trained models folder")
+    parser.add_argument("--out", type=Path, default=Path("eval"), help="where to save the report")
+    parser.add_argument("--eval-max-docs", type=int, default=300, help="validation documents to score")
+    parser.add_argument("--num-examples", type=int, default=5, help="examples per qualitative list")
+    parser.add_argument("--device", default="cpu", help="cuda or cpu")
     args = parser.parse_args()
 
     val_path = args.data_dir / args.dataset / "val.jsonl"
@@ -170,9 +184,7 @@ def main():
 
     report = format_report(args.dataset, ngram_scores, transformer_scores, texts, args.num_examples)
 
-    # Save before printing: real corpora (WikiText-103 especially) contain characters
-    # outside the Windows console's default codepage, which crashes print() -- the saved
-    # file must not be lost just because the console can't display every character.
+    # Save before printing, so the report is kept even if the console cannot show some characters.
     args.out.mkdir(parents=True, exist_ok=True)
     out_path = args.out / f"error_analysis_{args.dataset}.md"
     out_path.write_text(report, encoding="utf-8")
