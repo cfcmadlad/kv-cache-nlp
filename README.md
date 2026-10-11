@@ -95,20 +95,19 @@ python scripts/check_setup.py
 python scripts/demo.py
 ```
 
-How long each step takes. The last two rows were measured on our laptop; the others are
-typical and depend mostly on your connection:
+How long each step takes. The clone, fetch and check rows were measured from a fresh clone of
+this repository on our laptop and home connection; the install rows are typical:
 
 | Step | Time | Notes |
 |---|---|---|
-| `git clone` | a few seconds | The repository is under 1 MB. |
+| `git clone` | 2 seconds | The repository is under 1 MB. |
 | Create the virtual environment | about 10 seconds | |
 | Install PyTorch | several minutes | The CUDA wheel is about 2.5 to 3 GB, the CPU wheel about 200 MB. This is by far the slowest step, and it happens once. |
 | `pip install -r requirements.txt` | under a minute | Mostly the `datasets` package, which only `prepare_data.py` needs. |
-| `python scripts/fetch_assets.py` | download time for 138 MB, plus about 5 seconds | Downloads the zip, verifies its SHA-256, unpacks 219 MB. Measured: 5.6 s from a local server, so at 50 Mbit/s expect about 30 s in total. |
+| `python scripts/fetch_assets.py` | about 75 seconds | Downloads the 138 MB zip from the GitHub release, verifies its SHA-256 and unpacks 219 MB. Mostly download time, so it depends on your connection. A stalled connection times out after 30 seconds and is retried up to three times. |
 | `python scripts/check_setup.py` | 5 to 10 seconds | Measured on both GPU and CPU. Loads all four models; no training. |
 
-With PyTorch already installed, clone to PASS takes about a minute, almost all of it the
-download.
+With PyTorch already installed, clone to PASS took 85 seconds, almost all of it the download.
 
 When `check_setup.py` ends with `PASS`, you are ready for the review. If it prints `FAIL`, the
 message under it says what to run; see also [Troubleshooting](#troubleshooting).
@@ -316,9 +315,9 @@ The output is one JSON object per line, `{"id": "wikitext103-train-0", "text": "
 byte counts.
 
 We considered and rejected larger corpora (raw Wikipedia dumps, C4, OpenWebText) as too large
-for the compute and time available, and Project Gutenberg because WikiText already covers the
-long-form case without Gutenberg's licence headers. Source code corpora are kept for the
-code-versus-prose comparison planned for Part 3.
+for the compute and time available. Two more datasets from our Part 1 plan are kept for Part 3:
+PG-19 (books from Project Gutenberg) for the long-context tests, and The Stack Smol (source code)
+for the code-versus-prose comparison.
 
 ## Classical baseline: Kneser-Ney byte 4-gram
 
@@ -507,7 +506,9 @@ What the numbers say:
   Transformer even scores better on validation than on its training sample, which reflects the
   particular 200 training documents in the sample rather than a problem.
 - The error analysis (`eval/error_analysis_<dataset>.md`) finds that the two models' per-document
-  scores are strongly correlated (Pearson r = 0.74 on TinyStories, 0.73 on WikiText-103). Both
+  scores are strongly correlated (Pearson r = 0.74 on the 300 TinyStories and 0.73 on the 60
+  WikiText-103 validation documents it scores; on the 500 TinyStories documents of the results
+  table it is 0.75, the figure in our report). Both
   models struggle on the same documents, typically those with rarer words ("octopus",
   "rhinoceros", "miserable" in TinyStories), and do best on the same formulaic ones. Difficulty is
   largely a property of the text. The Transformer's advantage comes from being better everywhere

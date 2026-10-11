@@ -17,9 +17,12 @@ Usage:
 
 import argparse
 import hashlib
+import http.client
 import shutil
 import sys
 import tempfile
+import time
+import urllib.error
 import urllib.request
 import zipfile
 from pathlib import Path
@@ -39,10 +42,11 @@ def sha256_of(fileobj) -> str:
     return digest.hexdigest()
 
 
-def download(url: str, dest: Path) -> None:
-    """Stream url to dest, printing progress in MB."""
-    print(f"Downloading {url}")
-    with urllib.request.urlopen(url) as response, dest.open("wb") as out:
+def download_once(url: str, dest: Path) -> None:
+    """Stream url to dest, printing progress in MB; raise OSError if it stalls or stops early."""
+    # Without a timeout a stalled connection hangs forever with no message, which we
+    # saw happen once on a real network; 30 s without any data counts as a failure.
+    with urllib.request.urlopen(url, timeout=30) as response, dest.open("wb") as out:
         total = int(response.headers.get("Content-Length", 0))
         done = 0
         for block in iter(lambda: response.read(1 << 20), b""):
@@ -51,6 +55,23 @@ def download(url: str, dest: Path) -> None:
             if total:
                 print(f"\r  {done / 1e6:6.1f} / {total / 1e6:.1f} MB", end="", flush=True)
     print()
+    if total and done != total:
+        raise OSError(f"connection closed after {done:,} of {total:,} bytes")
+
+
+def download(url: str, dest: Path, attempts: int = 3) -> None:
+    """download_once, retried a few times because a single connection can drop."""
+    print(f"Downloading {url}")
+    for attempt in range(1, attempts + 1):
+        try:
+            download_once(url, dest)
+            return
+        except (OSError, http.client.HTTPException) as e:
+            # An HTTP error such as 404 will not go away on retry; a dropped connection may.
+            if attempt == attempts or isinstance(e, urllib.error.HTTPError):
+                raise OSError(e) from e
+            print(f"\n  attempt {attempt} failed ({e}), retrying...")
+            time.sleep(3)
 
 
 def plan_extraction(archive: zipfile.ZipFile, force: bool) -> list:
