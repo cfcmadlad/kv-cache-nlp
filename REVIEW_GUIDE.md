@@ -100,6 +100,12 @@ write-up. Each of these takes under a minute and can be done live:
 - **How are the discounts chosen?** `_fit_discounts`: `D = n1 / (n1 + 2 * n2)` per order from the
   number of (context, byte) pairs whose count in that order's table is exactly 1 and exactly 2,
   clamped to [0.1, 0.9].
+- **Is loading a model file safe?** A plain `pickle.load` runs any code hidden in a file, so
+  `KneserNeyByteLM.load` uses `_RestrictedUnpickler`, which rebuilds only the three classes our
+  checkpoints contain (`KneserNeyByteLM`, `Counter`, `defaultdict`) and refuses anything else. The
+  Transformer is loaded with `torch.load(..., weights_only=True)`, which reads tensors and plain
+  values only. On top of that, `fetch_assets.py` checks the SHA-256 of the whole release zip before
+  unpacking it, and refuses any path in the zip outside `checkpoints/` and `data/processed/`.
 - **Can a probability be zero?** No. The recursion ends in a uniform 1/256, so every byte has
   positive probability; the 1e-12 floor in `log2_prob_doc` is only a guard.
 

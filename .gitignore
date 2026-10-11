@@ -1,5 +1,4 @@
 # Data and trained models: download with scripts/fetch_assets.py, never commit
-data/raw/
 data/processed/
 checkpoints/
 

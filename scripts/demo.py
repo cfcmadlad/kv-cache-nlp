@@ -57,11 +57,17 @@ def ensure_assets() -> bool:
     return subprocess.run(fetch, cwd=REPO_ROOT, check=False).returncode == 0
 
 
+def read_line(prompt: str) -> str:
+    """input() without surrounding spaces or a byte-order mark. PowerShell set to UTF-8
+    puts an invisible BOM in front of piped input, which would make "1" not match."""
+    return input(prompt).replace("\ufeff", "").strip()
+
+
 def ask(prompt: str, choices: list) -> str:
     """Prompt until the user types one of choices."""
     choice_str = "/".join(choices)
     while True:
-        answer = input(f"{prompt} ({choice_str}): ").strip().lower()
+        answer = read_line(f"{prompt} ({choice_str}): ").lower()
         if answer in choices:
             return answer
         print(f"  Please enter one of: {choice_str}")
@@ -146,7 +152,7 @@ def explore_model():
 
     print("\nType a sentence to score it and see the model continue it. Empty line to go back.\n")
     while True:
-        text = input("> ").strip()
+        text = read_line("> ")
         if not text:
             return
         try:
@@ -171,7 +177,7 @@ def main():
         print("3) Explore a trained model (score your text / see it generate)")
         print("4) Verify the reported numbers (re-scores the evaluation sets)")
         print("5) Quit")
-        choice = input("> ").strip()
+        choice = read_line("> ")
 
         if choice == "1":
             train_live()

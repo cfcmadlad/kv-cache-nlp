@@ -147,4 +147,19 @@ class KneserNeyByteLM:
         # must be on sys.path before loading (importing scripts/data_utils.py does that).
         # For the same reason, renaming this module or class breaks existing checkpoints.
         with open(path, "rb") as f:
-            return pickle.load(f)
+            return _RestrictedUnpickler(f).load()
+
+
+class _RestrictedUnpickler(pickle.Unpickler):
+    """Unpickler that only rebuilds the classes a saved KneserNeyByteLM contains.
+
+    A plain pickle.load can run arbitrary code hidden in a tampered file; this one refuses
+    anything outside the three classes our checkpoints actually use."""
+
+    ALLOWED = {("models.ngram", "KneserNeyByteLM"), ("collections", "Counter"),
+               ("collections", "defaultdict")}
+
+    def find_class(self, module, name):
+        if (module, name) not in self.ALLOWED:
+            raise pickle.UnpicklingError(f"refusing to load {module}.{name} from an n-gram checkpoint")
+        return super().find_class(module, name)

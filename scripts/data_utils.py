@@ -80,7 +80,8 @@ def load_transformer(checkpoints_dir: Path, dataset: str, device: str = "cpu"):
     from models.transformer import GPT
 
     ckpt_path = _find_latest(checkpoints_dir, f"transformer_{dataset}_*.pt")
-    ckpt = torch.load(ckpt_path, map_location=device, weights_only=False)
+    # weights_only=True loads tensors and plain values only, never code hidden in the file.
+    ckpt = torch.load(ckpt_path, map_location=device, weights_only=True)
     model = GPT(**ckpt["config"])
     model.load_state_dict(ckpt["state_dict"])
     model.to(device)
