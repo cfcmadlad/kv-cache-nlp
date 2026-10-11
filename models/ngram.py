@@ -1,7 +1,9 @@
-"""Byte-level n-gram LM with interpolated Kneser-Ney smoothing.
+"""Classical baseline: byte-level n-gram LM with interpolated Kneser-Ney smoothing.
 
+Trained by scripts/train_ngram.py and saved as a pickle of this class; loaded again by
+scripts/data_utils.load_ngram for the demo, error analysis and check_setup.py.
+Vocabulary is the 256 raw byte values, so there is no tokenizer.
 Reference: Kneser & Ney (1995); interpolated formulation from Chen & Goodman (1999).
-Vocabulary is the 256 raw byte values -- no tokenization.
 """
 
 from __future__ import annotations
@@ -29,7 +31,7 @@ class KneserNeyByteLM:
         P(byte | context) = max(c - D, 0) / total + D * num_types / total * lower
     `lower` is the order-(k-1) estimate; at k == 0 it bottoms out at a uniform
     distribution over the vocabulary. The only thing that differs per order is
-    which count table backs `c`/`total`/`num_types` -- raw counts at the top
+    which count table backs `c`/`total`/`num_types`: raw counts at the top
     order, continuation counts (from `_table`) below that.
     """
 
@@ -48,6 +50,7 @@ class KneserNeyByteLM:
         return self.counts[k] if k == self.order - 1 else self.cont[k]
 
     def fit(self, byte_docs: list) -> None:
+        """Count n-grams of every order, derive continuation counts, then fit the discounts."""
         # Reset state so fit() is safe to call more than once on the same instance.
         self.counts = [defaultdict(Counter) for _ in range(self.order)]
         self.cont = [defaultdict(Counter) for _ in range(self.order - 1)]
@@ -61,7 +64,9 @@ class KneserNeyByteLM:
                     self.counts[k][context][byte] += 1
 
         # Continuation counts: for order k, count distinct (order k+1) contexts
-        # that support each (shorter context, byte) pair -- not raw frequency.
+        # that support each (shorter context, byte) pair, not raw frequency. This is what
+        # makes it Kneser-Ney: a byte that follows many different contexts gets more
+        # lower-order mass than one that is frequent only after a single context.
         for k in range(self.order - 1):
             for context, next_counter in self.counts[k + 1].items():
                 suffix = context[1:]
@@ -71,6 +76,9 @@ class KneserNeyByteLM:
         self._fit_discounts()
 
     def _fit_discounts(self) -> None:
+        # Absolute discount per order from count-of-counts: D = n1 / (n1 + 2 * n2), where
+        # n1/n2 are how many (context, byte) pairs have count exactly 1/2 in that order's
+        # table (Ney, Essen & Kneser 1994). Clamped to [0.1, 0.9] for stability.
         for k in range(self.order):
             n1 = n2 = 0
             for next_counter in self._table(k).values():
@@ -97,6 +105,7 @@ class KneserNeyByteLM:
         return max(c - d, 0) / total + d * num_types / total * lower
 
     def log2_prob_doc(self, doc: bytes) -> float:
+        """log2 P(doc): sum over every byte, each predicted from up to order-1 previous bytes."""
         padded = (START,) * (self.order - 1) + tuple(doc)
         total_log2 = 0.0
         for i in range(self.order - 1, len(padded)):
@@ -118,6 +127,7 @@ class KneserNeyByteLM:
         return bytes(padded[self.order - 1:])
 
     def bits_per_byte(self, docs: list) -> float:
+        """Total bits over all docs divided by total bytes (not a mean of per-doc BPB)."""
         total_log2 = 0.0
         total_bytes = 0
         for doc in docs:
@@ -133,8 +143,8 @@ class KneserNeyByteLM:
 
     @staticmethod
     def load(path: Path) -> "KneserNeyByteLM":
-        # Pickle needs `models.ngram` importable under that exact name to unpickle --
-        # any caller outside scripts/ must put the repo root on sys.path first (importing
-        # scripts/data_utils.py does this as a side effect; see that module's docstring).
+        # The pickle refers to the class as `models.ngram.KneserNeyByteLM`, so the repo root
+        # must be on sys.path before loading (importing scripts/data_utils.py does that).
+        # For the same reason, renaming this module or class breaks existing checkpoints.
         with open(path, "rb") as f:
             return pickle.load(f)
