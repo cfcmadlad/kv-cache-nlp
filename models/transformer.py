@@ -1,47 +1,26 @@
-"""Modern baseline: a small GPT-2-style decoder-only Transformer over BPE token ids.
-
-Trained by scripts/train_bpe_transformer.py, which saves {"config", "state_dict"};
-scripts/data_utils.load_transformer rebuilds GPT(**config) from that. Attribute names
-below are state_dict keys, so renaming them breaks existing checkpoints.
-"""
-
 import torch
 import torch.nn as nn
 import torch.nn.functional as F
 
 
 class CausalSelfAttention(nn.Module):
-    """Multi-head self-attention in which each position sees only itself and earlier positions."""
-
     def __init__(self, n_embd: int, n_head: int, dropout: float):
         super().__init__()
         assert n_embd % n_head == 0
         self.n_head = n_head
-        self.qkv = nn.Linear(n_embd, 3 * n_embd)  # queries, keys and values in one matrix multiply
+        self.qkv = nn.Linear(n_embd, 3 * n_embd)
         self.proj = nn.Linear(n_embd, n_embd)
         self.dropout = dropout
 
     def forward(self, x: torch.Tensor) -> torch.Tensor:
-        B, T, C = x.shape  # batch size, sequence length, model width
-        q, k, v = self.qkv(x).split(C, dim=2)
-        # Split the width into n_head heads of head_dim each: (B, T, C) -> (B, n_head, T, head_dim).
-        head_dim = C // self.n_head
-        q = q.view(B, T, self.n_head, head_dim).transpose(1, 2)
-        k = k.view(B, T, self.n_head, head_dim).transpose(1, 2)
-        v = v.view(B, T, self.n_head, head_dim).transpose(1, 2)
-        # is_causal=True applies the lower-triangular attention mask: position t only attends
-        # to positions <= t. No KV cache is kept; k and v are recomputed for the whole
-        # context on every call (see GPT.generate). Part 3 is about caching these.
-        y = F.scaled_dot_product_attention(
-            q, k, v, is_causal=True, dropout_p=self.dropout if self.training else 0.0
-        )
-        y = y.transpose(1, 2).contiguous().view(B, T, C)  # concatenate the heads again
-        return self.proj(y)
+        B, T, C = x.shape
+        q, k, v = self.qkv(x).view(B, T, 3, self.n_head, C // self.n_head).permute(2, 0, 3, 1, 4)
+        y = F.scaled_dot_product_attention(q, k, v, is_causal=True,
+                                           dropout_p=self.dropout if self.training else 0.0)
+        return self.proj(y.transpose(1, 2).reshape(B, T, C))
 
 
 class MLP(nn.Module):
-    """Position-wise feed-forward layer: widen 4x, GELU, project back."""
-
     def __init__(self, n_embd: int, dropout: float):
         super().__init__()
         self.fc = nn.Linear(n_embd, 4 * n_embd)
@@ -53,8 +32,6 @@ class MLP(nn.Module):
 
 
 class Block(nn.Module):
-    """Pre-LN transformer block: attend, then MLP, each with a residual connection."""
-
     def __init__(self, n_embd: int, n_head: int, dropout: float):
         super().__init__()
         self.ln1 = nn.LayerNorm(n_embd)
@@ -64,13 +41,10 @@ class Block(nn.Module):
 
     def forward(self, x: torch.Tensor) -> torch.Tensor:
         x = x + self.attn(self.ln1(x))
-        x = x + self.mlp(self.ln2(x))
-        return x
+        return x + self.mlp(self.ln2(x))
 
 
 class GPT(nn.Module):
-    """Decoder-only Transformer LM. Input/output token embeddings are tied."""
-
     def __init__(self, vocab_size: int, block_size: int, n_layer: int = 6,
                  n_head: int = 6, n_embd: int = 384, dropout: float = 0.1):
         super().__init__()
@@ -81,13 +55,7 @@ class GPT(nn.Module):
         self.blocks = nn.ModuleList([Block(n_embd, n_head, dropout) for _ in range(n_layer)])
         self.ln_f = nn.LayerNorm(n_embd)
         self.head = nn.Linear(n_embd, vocab_size, bias=False)
-        # Weight tying: the output head reuses the input embedding matrix, saving
-        # vocab_size * n_embd parameters (3.07M of the 13.8M here).
         self.head.weight = self.tok_emb.weight
-
-        # nn.Embedding's default init (std=1.0) is far too large for this model scale and
-        # blows up the logits computed via the tied head; GPT-2-style std=0.02 keeps the
-        # initial loss near ln(vocab_size), as it should be for an untrained model.
         self.apply(self._init_weights)
 
     @staticmethod
@@ -98,18 +66,13 @@ class GPT(nn.Module):
                 nn.init.zeros_(module.bias)
 
     def forward(self, idx: torch.Tensor, targets: torch.Tensor = None):
-        B, T = idx.shape
+        T = idx.size(1)
         assert T <= self.block_size, f"sequence length {T} exceeds block_size {self.block_size}"
-        pos = torch.arange(T, device=idx.device)
-        x = self.drop(self.tok_emb(idx) + self.pos_emb(pos))
+        x = self.drop(self.tok_emb(idx) + self.pos_emb(torch.arange(T, device=idx.device)))
         for block in self.blocks:
             x = block(x)
-        x = self.ln_f(x)
-        logits = self.head(x)
-
-        loss = None
-        if targets is not None:
-            loss = F.cross_entropy(logits.reshape(-1, logits.size(-1)), targets.reshape(-1))
+        logits = self.head(self.ln_f(x))
+        loss = None if targets is None else F.cross_entropy(logits.flatten(0, 1), targets.flatten())
         return logits, loss
 
     def num_params(self) -> int:
@@ -117,18 +80,14 @@ class GPT(nn.Module):
 
     @torch.no_grad()
     def generate(self, idx: torch.Tensor, max_new_tokens: int, temperature: float = 0.8) -> torch.Tensor:
-        """Sample max_new_tokens continuation ids for each sequence in idx. Each step runs the
-        full forward pass over the last block_size tokens (no KV cache)."""
-        idx = idx.to(next(self.parameters()).device)
+        idx = idx.to(self.head.weight.device)
         was_training = self.training
         self.eval()
         try:
             for _ in range(max_new_tokens):
-                context = idx[:, -self.block_size:]
-                logits, _ = self(context)
-                probs = F.softmax(logits[:, -1, :] / temperature, dim=-1)
-                next_id = torch.multinomial(probs, num_samples=1)
-                idx = torch.cat([idx, next_id], dim=1)
+                logits, _ = self(idx[:, -self.block_size:])
+                probs = F.softmax(logits[:, -1] / temperature, dim=-1)
+                idx = torch.cat([idx, torch.multinomial(probs, 1)], dim=1)
         finally:
             self.train(was_training)
         return idx

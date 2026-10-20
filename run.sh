@@ -1,15 +1,7 @@
 #!/usr/bin/env bash
-# One-command demo for Linux and macOS: run "bash run.sh" in this folder.
-# 1) finds Python 3.10+ (installs it with Homebrew or apt if missing)
-# 2) uses that Python if it already has PyTorch; otherwise creates one shared environment in
-#    ~/.cache/kv-cache-nlp/venv and installs PyTorch and requirements.txt into it
-# 3) starts scripts/demo.py, which gets the trained models and data on its first run
-# The environment lives outside this folder so that a fresh copy of the code (for example a
-# new download from LMS) reuses it instead of installing PyTorch again.
 cd "$(dirname "$0")" || exit 1
 NEEDED="import torch, numpy, tokenizers, tqdm"
 
-# --- 1. Python -------------------------------------------------------------------------
 find_python() {
     for candidate in python3 python; do
         if command -v "$candidate" >/dev/null 2>&1 &&
@@ -36,12 +28,10 @@ if ! find_python; then
 fi
 echo "Using Python: $(command -v "$PY")"
 
-# --- 2. Packages: reuse this Python if it is ready, else the shared environment -----------
 if "$PY" -c "$NEEDED" 2>/dev/null; then
     VPY="$PY"
 else
     VENV="${XDG_CACHE_HOME:-$HOME/.cache}/kv-cache-nlp/venv"
-    # A venv keeps Python in bin/ on Linux and macOS, and in Scripts/ under Git Bash on Windows.
     venv_python() { if [ -x "$VENV/bin/python" ]; then echo "$VENV/bin/python"; else echo "$VENV/Scripts/python.exe"; fi; }
     if [ ! -x "$VENV/bin/python" ] && [ ! -f "$VENV/Scripts/python.exe" ]; then
         echo "Creating a Python environment in $VENV (one time only)..."
@@ -70,9 +60,7 @@ else
         fi
         echo "Installing the other requirements..."
         "$VPY" -m pip install -r requirements.txt || exit 1
-        # If an install keeps failing, a half-built environment may be the cause: rm -rf "$VENV" and retry.
     fi
 fi
 
-# --- 3. Demo -------------------------------------------------------------------------
 exec "$VPY" scripts/demo.py

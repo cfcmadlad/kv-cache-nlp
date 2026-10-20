@@ -1,23 +1,9 @@
-"""Step 3: build the bits-per-byte comparison table for both baselines (demo option 2).
-
-Reads every checkpoints/*_results.json written by train_ngram.py and
-train_bpe_transformer.py, groups them by dataset, prints a Markdown table and saves it to
-eval/bpb_comparison.md. Each model reports on its own validation slice (see val_docs);
-check_setup.py --full gives the matched-document comparison.
-
-Usage:
-    python scripts/bpb_harness.py
-    python scripts/bpb_harness.py --checkpoints-dir checkpoints --out eval
-"""
-
 import argparse
 import json
 from collections import defaultdict
 from pathlib import Path
 
 SHARED_COLUMNS = ["model", "train_docs", "val_docs", "train_time_sec", "train_bpb_sample", "val_bpb"]
-
-# Extra, model-specific context worth showing alongside the shared columns.
 EXTRA_COLUMNS = {
     "kneser_ney_ngram": ["order", "discounts"],
     "bpe_transformer": ["num_params", "n_layer", "n_embd", "block_size"],
@@ -25,77 +11,51 @@ EXTRA_COLUMNS = {
 
 
 def load_results(checkpoints_dir: Path) -> list:
-    """One result dict per (model, dataset) pair. If several files exist for a pair, the
-    most recently written one is used and a note is printed. Unreadable files are skipped
-    with a warning instead of stopping the whole table."""
-    by_key = defaultdict(list)
-    for path in sorted(checkpoints_dir.glob("*_results.json")):
+    latest = {}
+    for path in sorted(checkpoints_dir.glob("*_results.json"), key=lambda p: p.stat().st_mtime):
         try:
             data = json.loads(path.read_text(encoding="utf-8"))
-            data["_path"] = path
-            by_key[(data["model"], data["dataset"])].append(data)
+            latest[(data["model"], data["dataset"])] = data
         except (json.JSONDecodeError, KeyError) as e:
             print(f"Skipping {path}: {e}")
-
-    results = []
-    for (model, dataset), entries in by_key.items():
-        if len(entries) > 1:
-            entries.sort(key=lambda d: d["_path"].stat().st_mtime)
-            print(f"Note: {len(entries)} results.json found for {model}/{dataset}, "
-                  f"using the most recent: {entries[-1]['_path'].name}")
-        results.append(entries[-1])
-    return results
+    return list(latest.values())
 
 
-def _format_cell(value) -> str:
-    """Comma-join lists (the n-gram discounts) and escape '|' so it is not read as a column break."""
+def _cell(value) -> str:
     if isinstance(value, list):
-        value = ", ".join(str(v) for v in value)
+        value = ", ".join(map(str, value))
     return str(value).replace("|", "\\|")
 
 
 def format_table(results: list) -> str:
-    """One Markdown table per dataset: shared columns first, then each model's extras."""
-    datasets = sorted({r["dataset"] for r in results})
+    by_dataset = defaultdict(list)
+    for r in results:
+        by_dataset[r["dataset"]].append(r)
     lines = []
-    for dataset in datasets:
-        rows = [r for r in results if r["dataset"] == dataset]
-        columns = list(SHARED_COLUMNS)
-        for row in rows:
-            for col in EXTRA_COLUMNS.get(row["model"], []):
-                if col not in columns:
-                    columns.append(col)
-
-        lines.append(f"### {dataset}\n")
-        lines.append("| " + " | ".join(columns) + " |")
-        lines.append("|" + "|".join(["---"] * len(columns)) + "|")
-        for row in rows:
-            cells = [_format_cell(row.get(col, "-")) for col in columns]
-            lines.append("| " + " | ".join(cells) + " |")
+    for dataset in sorted(by_dataset):
+        rows = by_dataset[dataset]
+        columns = SHARED_COLUMNS + [c for r in rows for c in EXTRA_COLUMNS.get(r["model"], [])]
+        columns = list(dict.fromkeys(columns))
+        lines += [f"### {dataset}\n", "| " + " | ".join(columns) + " |", "|" + "---|" * len(columns)]
+        lines += ["| " + " | ".join(_cell(r.get(c, "-")) for c in columns) + " |" for r in rows]
         lines.append("")
     return "\n".join(lines)
 
 
 def main():
-    parser = argparse.ArgumentParser(description=__doc__)
-    parser.add_argument("--checkpoints-dir", type=Path, default=Path("checkpoints"),
-                         help="folder with the *_results.json files")
-    parser.add_argument("--out", type=Path, default=Path("eval"), help="where to save bpb_comparison.md")
-    args = parser.parse_args()
-
+    p = argparse.ArgumentParser()
+    p.add_argument("--checkpoints-dir", type=Path, default=Path("checkpoints"))
+    p.add_argument("--out", type=Path, help="optional markdown file to write the table to")
+    args = p.parse_args()
     results = load_results(args.checkpoints_dir)
     if not results:
-        print(f"No *_results.json found in {args.checkpoints_dir}. "
-              "Run python scripts/fetch_assets.py, or train both baselines.")
+        print(f"No *_results.json in {args.checkpoints_dir}. Run scripts/fetch_assets.py or train a model.")
         return
-
     table = format_table(results)
     print(table)
-
-    args.out.mkdir(parents=True, exist_ok=True)
-    out_path = args.out / "bpb_comparison.md"
-    out_path.write_text(f"# BPB comparison\n\n{table}", encoding="utf-8")
-    print(f"Saved to {out_path}")
+    if args.out:
+        args.out.parent.mkdir(parents=True, exist_ok=True)
+        args.out.write_text(f"# BPB comparison\n\n{table}", encoding="utf-8")
 
 
 if __name__ == "__main__":

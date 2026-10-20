@@ -1,16 +1,7 @@
 @echo off
-rem One-command demo for Windows: double-click this file, or run ".\run.bat" in a terminal.
-rem 1) finds Python 3.10+ (installs Python 3.12 with winget if missing)
-rem 2) uses that Python if it already has PyTorch; otherwise creates one shared environment in
-rem    %LOCALAPPDATA%\kv-cache-nlp\venv and installs PyTorch and requirements.txt into it
-rem 3) starts scripts\demo.py, which gets the trained models and data on its first run
-rem The environment lives outside this folder so that a fresh copy of the code (for example a
-rem new download from LMS) reuses it instead of installing PyTorch again.
 setlocal
 cd /d "%~dp0"
 
-rem --- 1. Python ------------------------------------------------------------------------
-rem "python" can be the Microsoft Store placeholder, so test that it really runs Python 3.10+.
 set "PY="
 for /f "delims=" %%i in ('python -c "import sys; assert sys.version_info >= (3, 10); print(sys.executable)" 2^>nul') do set "PY=%%i"
 if not defined PY for /f "delims=" %%i in ('py -3 -c "import sys; assert sys.version_info >= (3, 10); print(sys.executable)" 2^>nul') do set "PY=%%i"
@@ -27,7 +18,6 @@ goto fail
 :have_python
 echo Using Python: %PY%
 
-rem --- 2. Packages: reuse this Python if it is ready, else the shared environment -----------
 "%PY%" -c "import torch, numpy, tokenizers, tqdm" >nul 2>&1 || goto use_venv
 set "VPY=%PY%"
 goto run_demo
@@ -49,10 +39,8 @@ echo Installing PyTorch from %TORCH_INDEX% (one time only; the GPU build is abou
 echo Installing the other requirements...
 "%VPY%" -m pip install -r requirements.txt || goto pip_failed
 
-rem --- 3. Demo ---------------------------------------------------------------------------
 :run_demo
 "%VPY%" scripts\demo.py
-rem Keep the window open on an error, so a double-clicked run.bat does not hide the message.
 if errorlevel 1 goto fail
 exit /b 0
 
