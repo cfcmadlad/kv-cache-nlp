@@ -1,0 +1,13 @@
+{
+  "seed": 0,
+  "steps": 200,
+  "batch_size": 16,
+  "lr": 0.003,
+  "warmup": 10,
+  "min_lr_frac": 0.1,
+  "grad_clip": 1.0,
+  "ckpt_every": 25,
+  "log_every": 10,
+  "corpus_bytes": 200000,
+  "model": {"block": 64, "n_layer": 2, "n_head": 4, "n_embd": 128, "dropout": 0.0}
+}

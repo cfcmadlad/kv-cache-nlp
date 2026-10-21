@@ -57,3 +57,21 @@ For WikiText-103 the reported runs used `--max-train-docs 4500 --eval-max-docs 6
 ## Data
 
 TinyStories (30,000 train stories, 21,990 validation) and WikiText-103 (articles rebuilt from the raw line export, placeholder tokens such as `@-@` restored), Unicode NFC normalised, exact duplicates removed. Part 3 adds PG-19 for long contexts and The Stack Smol for code.
+
+## Part 3 (in progress)
+
+Byte-level BLT-style model with patch-granular KV cache policies. Runs write to `runs/<id>/`; byte data to `data/bytes/`.
+
+```bash
+python scripts/prepare_bytes.py && python scripts/prepare_bytes.py --verify
+python scripts/train_entropy.py configs/entropy_tinystories.json
+python scripts/patch_entropy.py --run entropy_tinystories --max-docs 500
+python scripts/cache_entropy.py --run entropy_tinystories
+python scripts/train_blt.py configs/blt_tinystories_entropy.json
+python scripts/eval_policies.py --run blt_tinystories_entropy --max-docs 500 --budgets 12 16 32 64 128
+python scripts/eval_quant.py --run blt_tinystories_entropy --max-docs 500 --hi-bits 4 --lo-bits 2
+python scripts/results.py --phase 2
+python -m pytest
+```
+
+Plan in `PLAN.md`, related work in `NOVELTY.md`, problems in `CHALLENGES.md`, per-block notes and results in `docs/`.

@@ -16,3 +16,4 @@
 *.pkl binary
 *.zip binary
 *.png binary
+*.sbatch text eol=lf

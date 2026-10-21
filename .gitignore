@@ -1,6 +1,8 @@
 data/processed/
 checkpoints/
-results/
+results/*
+!results/part3/
+!results/phase2.md
 __pycache__/
 *.pyc
 .venv/
@@ -9,3 +11,8 @@ venv/
 report_kit/
 *.pdf
 *.zip
+runs/
+.pytest_cache/
+slurm/logs/*
+!slurm/logs/.gitkeep
+data/bytes/

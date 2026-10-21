@@ -1,0 +1,15 @@
+{
+  "dataset": "tinystories",
+  "seed": 0,
+  "steps": 3000,
+  "batch_size": 32,
+  "block": 1024,
+  "lr": 0.002,
+  "warmup": 100,
+  "min_lr_frac": 0.1,
+  "weight_decay": 0.01,
+  "grad_clip": 1.0,
+  "ckpt_every": 500,
+  "log_every": 50,
+  "model": {"n_layer": 4, "n_head": 4, "dim": 256, "window": 512}
+}
