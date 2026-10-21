@@ -18,7 +18,9 @@ class Policy:
 
 def patch_entropy_scores(patch_in: np.ndarray, h: np.ndarray, num_patches: int, agg: str) -> np.ndarray:
     out = np.zeros(num_patches)
-    if agg == "max":
+    if agg == "first":
+        out[patch_in[::-1]] = h[::-1]
+    elif agg == "max":
         np.maximum.at(out, patch_in, h)
     else:
         np.add.at(out, patch_in, h)

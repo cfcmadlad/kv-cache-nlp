@@ -146,6 +146,8 @@ class BLT(nn.Module):
         state["sum"] = e if state["sum"] is None else state["sum"] + e
         state["count"] += 1
         state["h_sum"] += entropy
+        if state["count"] == 1:
+            state["h_first"] = entropy
         state["h_max"] = max(state["h_max"], entropy)
         if starts_next:
             state["count_prev"] = state["count"]
@@ -191,7 +193,7 @@ def _patch_score(state, pid: int, policy: Policy) -> float:
     if policy.mode == "random":
         state.setdefault("rng", np.random.default_rng(policy.seed))
         return float(state["rng"].random())
-    h = state["h_max"] if policy.agg == "max" else state["h_sum"] / state["count_prev"]
+    h = {"max": state["h_max"], "first": state.get("h_first"), "sum": state["h_sum"]}.get(policy.agg, state["h_sum"] / state["count_prev"])
     return h if policy.mode == "entropy" else -h
 
 

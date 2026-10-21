@@ -5,7 +5,7 @@ CS F429 Natural Language Processing, BITS Pilani Hyderabad, Group 12.
 
 Byte-level models read raw UTF-8, so a sentence spans about four times as many positions as in BPE tokens, and the KV cache grows with it. The Byte Latent Transformer (BLT) already computes next-byte entropy to place patch boundaries. This project tests whether that same entropy can decide which cache entries to evict or quantize, compared with recency (StreamingLLM), attention-score methods (H2O, SnapKV) and random eviction at an equal number of cache bytes.
 
-Part 2 (done) built the data pipeline and two baselines scored in bits per byte (BPB). Part 3 (in progress) adds the byte-level model and the cache policies.
+Part 2 (done) built the data pipeline and two baselines scored in bits per byte (BPB). Part 3 (in progress) adds the byte-level model, the cache policies and their evaluation. Headline so far, on one seed and small models: using next-byte entropy as the keep signal is negative. Keeping high-entropy patches, or giving them more bits, does worse than random and recency at the same cache bytes, and uniform 4-bit KV is within 0.001 BPB of fp16 at 27 percent of the bytes. See `docs/results_summary.md`.
 
 ## Baseline results
 
@@ -73,5 +73,18 @@ python scripts/eval_quant.py --run blt_tinystories_entropy --max-docs 500 --hi-b
 python scripts/results.py --phase 2
 python -m pytest
 ```
+
+Demo on a CPU laptop (option 4 of `scripts/demo.py` runs the policies and quantization on any text): `python scripts/fetch_assets.py`, then `run.bat` or `./run.sh`. Option 4 fetches the Part 3 models on first use with `scripts/part3_assets.py fetch`; the release asset `v0.3-part3` is built by `scripts/part3_assets.py build` and still has to be uploaded.
+
+Seeds, control and ablations (GPU, run one at a time; each script resumes finished runs):
+
+```bash
+bash scripts/run_seeds.sh
+bash scripts/run_ablations.sh
+python scripts/compare.py seeds --out results/part3/seeds.md
+python scripts/collate_viva.py
+```
+
+Status: seeds and ablations are in progress on the laptop GPU; Block 2.0 cluster verification, the code dataset and the final comparison and report are not done. Details in `PLAN.md`.
 
 Plan in `PLAN.md`, related work in `NOVELTY.md`, problems in `CHALLENGES.md`, per-block notes and results in `docs/`.

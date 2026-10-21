@@ -23,7 +23,7 @@ def test_policy_eval_end_to_end(tmp_path, monkeypatch):
     torch.manual_seed(0)
     model = BLT(**cfg["model"]).eval()
     args = type("A", (), dict(run="x", split="val", max_docs=None, policies=["recency", "random", "entropy"], budgets=[8, 24, 10_000],
-                              sink=1, recent=2, agg="mean", seed=0, random_seeds=2, entropy_run=None))
+                              sink=1, recent=2, agg="mean", seed=0, random_seeds=2, entropy_run=None, signal="entropy_model"))
     out = eval_policies.run(model, cfg, args, "cpu")
     v = out["variants"]
     assert out["docs"] == len(DOCS) and set(v) >= {"full|0", "recency|8", "random|24", "entropy|10000"}

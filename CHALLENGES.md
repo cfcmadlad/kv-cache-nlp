@@ -105,3 +105,10 @@ Strategy: report as measured; check WikiText, other aggregations (max) and the f
 1. Part 1: what were the main problems, and what did you do about them?
 2. Any problem from Part 2 that I have missed (data, time, team, tooling)?
 3. Release size limit: is 3,000 documents the real reason, or was it a GitHub limit?
+
+### Seed variance is the size of some effects
+
+Problem: the first extra seed of the TinyStories entropy-patched model has full-cache BPB 0.8125 against 0.7980 for seed 0.
+Impact: the 3.3 percent gap between entropy patching and fixed stride in `docs/results_summary.md` is within about two seed spreads and is not established. The eviction sign comparisons are paired on the same model and are not affected.
+Strategy: three seeds for the entropy-patched models and a stride-5 control; report per-seed numbers.
+Outcome: in progress.

@@ -8,6 +8,10 @@ Phases 0 and 1 are Parts 1 and 2 (done). Phases 3 to 9 below are my outline from
 
 Done and tested: 2.1 (except the code dataset, which is gated), 2.2, 2.3, 2.4 (four BLT runs, two entropy models, laptop GPU), 2.5 gate table, Phase 3 policies, Phase 4 quantization, an attention mechanism analysis from Phase 7. Numbers: `docs/results_summary.md`. Not done: 2.0 cluster verification, code dataset, three seeds, Phase 8 demo update, report text. The headline result is negative for the entropy rule; see the summary.
 
+## Status on 21 Oct (evening)
+
+Added since: seed 1 and 2 configs and a fixed-stride-5 control (`scripts/run_seeds.sh`; seed 1 of TinyStories entropy done and the sign holds), ablation tooling (`--signal own`, `--agg first|sum`, sink size, byte-level model with stride 1; `scripts/run_ablations.sh`), the Part 3 demo (option 4, `scripts/part3_assets.py`, tested from a clean copy on CPU), `scripts/compare.py seeds` and `scripts/collate_viva.py`. Waiting on the GPU queue: remaining seeds, ablations. Needs the HPC or the user: Block 2.0 verification, code dataset, upload of the `v0.3-part3` release asset (zip built by `part3_assets.py build`, SHA-256 already in the script), Part 1 and 2 gaps. Phase 9 tables and report text come after the runs finish.
+
 ## Phase 2: byte models (21 Oct to 31 Oct)
 
 | Block | Dates | Done when | Rubric |

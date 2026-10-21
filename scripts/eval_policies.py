@@ -9,7 +9,7 @@ from data_utils import REPO_ROOT
 from eval_blt import GLOBAL_CACHE_BYTES_PER_PATCH, load_blt
 from kvc.bytedata import open_split
 from kvc.cache import Policy, mean_cache_entries, patch_entropy_scores, patch_scores, visible_mask
-from kvc.patching import patch_flags
+from kvc.patching import entropy_from_logits, patch_flags
 from models.entropy import BOS
 from train_blt import patch_settings
 
@@ -42,16 +42,15 @@ def run(model, cfg, args, device):
             cs = np.cumsum(flags)
             patch_in = cs - flags
             P = int(cs[-1]) + 1
-            ent = patch_entropy_scores(patch_in, h[a:b].astype(np.float64), P, args.agg)
             inputs = (torch.from_numpy(x)[None].to(device), torch.from_numpy(flags)[None].to(device))
             target = torch.from_numpy(doc[a:b].astype(np.int64)).to(device)
-            chunk_full = None
+            logits = model(inputs)[0][0]
+            chunk_full = F.cross_entropy(logits.float(), target, reduction="sum").item()
+            hb = entropy_from_logits(logits).cpu().numpy().astype(np.float64) if args.signal == "own" else h[a:b].astype(np.float64)
+            ent = patch_entropy_scores(patch_in, hb, P, args.agg)
             for v in variants:
                 mode, budget = v
                 if mode == "full" or budget >= P:
-                    if chunk_full is None:
-                        logits = model(inputs)[0][0]
-                        chunk_full = F.cross_entropy(logits.float(), target, reduction="sum").item()
                     nats[v][di] += chunk_full
                     entries[v].append(P)
                     continue
@@ -69,7 +68,7 @@ def run(model, cfg, args, device):
     return {"run": args.run, "dataset": cfg["dataset"], "split": args.split, "docs": len(docs),
             "bytes_per_doc": sizes.tolist(), "bytes_per_patch": per_patch,
             "settings": {"sink": args.sink, "recent": args.recent, "agg": args.agg, "seed": args.seed,
-                         "random_seeds": args.random_seeds, "entropy_run": entropy_run},
+                         "random_seeds": args.random_seeds, "entropy_run": entropy_run, "signal": args.signal},
             "variants": {f"{m}|{b}": {"nats": nats[(m, b)].tolist(), "mean_entries": float(np.mean(entries[(m, b)])),
                                       "mean_cache_bytes": float(np.mean(entries[(m, b)])) * per_patch}
                          for m, b in variants}}
@@ -84,7 +83,8 @@ def main():
     p.add_argument("--budgets", nargs="+", type=int, default=[16, 32, 64, 128, 256, 512])
     p.add_argument("--sink", type=int, default=1)
     p.add_argument("--recent", type=int, default=8)
-    p.add_argument("--agg", default="mean")
+    p.add_argument("--agg", default="mean", choices=["mean", "max", "sum", "first"])
+    p.add_argument("--signal", default="entropy_model", choices=["entropy_model", "own"])
     p.add_argument("--seed", type=int, default=0)
     p.add_argument("--random-seeds", type=int, default=3)
     p.add_argument("--entropy-run", default=None)

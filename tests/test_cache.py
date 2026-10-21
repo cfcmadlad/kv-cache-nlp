@@ -29,7 +29,7 @@ def masked_forward(m, idx, nxt, h, policy):
 
 
 @pytest.mark.parametrize("mode", ["recency", "random", "entropy", "entropy_inv"])
-@pytest.mark.parametrize("agg", ["mean", "max"])
+@pytest.mark.parametrize("agg", ["mean", "max", "sum", "first"])
 def test_masked_forward_equals_real_eviction(mode, agg):
     torch.manual_seed(0)
     m = BLT(**SMALL).eval()
