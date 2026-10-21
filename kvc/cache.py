@@ -3,7 +3,8 @@ from dataclasses import dataclass
 
 import numpy as np
 
-MODES = ("full", "recency", "random", "entropy", "entropy_inv")
+MODES = ("full", "recency", "random", "entropy", "entropy_inv", "h2o", "snap")
+ATTN_MODES = ("h2o", "snap")
 
 
 @dataclass(frozen=True)
@@ -27,6 +28,14 @@ def patch_entropy_scores(patch_in: np.ndarray, h: np.ndarray, num_patches: int, 
         if agg == "mean":
             out /= np.maximum(np.bincount(patch_in, minlength=num_patches), 1)
     return out
+
+
+def attention_scores(attn: np.ndarray, mode: str, window: int) -> np.ndarray:
+    total = np.cumsum(np.tril(attn), axis=0)
+    if mode == "h2o":
+        return total
+    lag = np.vstack([np.zeros((window, attn.shape[1])), total[:-window]]) if window < len(total) else np.zeros_like(total)
+    return total - lag
 
 
 def patch_scores(policy: Policy, num_patches: int, entropy_scores: np.ndarray = None, rng=None) -> np.ndarray:
@@ -55,7 +64,7 @@ def visible_mask(num_patches: int, scores: np.ndarray, policy: Policy) -> np.nda
     for i in range(num_patches):
         ids = np.append(ids, i)
         if policy.mode != "full" and len(ids) > policy.budget:
-            ids = np.delete(ids, evict_one(ids, scores, policy))
+            ids = np.delete(ids, evict_one(ids, scores[i] if scores.ndim == 2 else scores, policy))
         mask[i, ids] = True
     return mask
 

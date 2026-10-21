@@ -45,3 +45,6 @@ Why compare the model's own entropy with the entropy model? The proposal could f
 Why does a sum rule tie random? Unknown. A sum favours long patches, so it mixes a length preference with the entropy preference; I have not separated the two.
 Why is the sink irrelevant here? Probably because the local layers see a 256-byte window of raw bytes and the documents are short; I did not test longer contexts, where a sink may matter.
 What might change the conclusion? Untested here: a task where rare surprising spans are queried later, such as retrieval or long-range copying, rather than next-byte prediction on short documents.
+Why score the attention policies offline? The tested simulation applies one mask per chunk, so attention scores cannot come from the evicted cache; I refine them once under the resulting mask. An online version would need score updates in the step API, which I have not built, so the numbers may differ.
+Why does snap help and h2o not? Unknown. A guess: snap scores recent attention, which stays close to recency while correcting it, whereas accumulated attention favours old patches that were popular early. I have not tested that.
+Why did the 16k models score worse than the 4k ones? Unknown. They saw four times fewer sequences per step and were not tuned; I did not test either.

@@ -6,10 +6,15 @@ import numpy as np
 from data_utils import REPO_ROOT
 from kvc.stats import bootstrap_ci, bootstrap_indices, bpb, paired_diff_ci
 
-SETS = {"tinystories": ("val", 500, [32, 64]), "wikitext103": ("val", 60, [64, 128]), "wikitext103mix": ("val", 60, [64, 128])}
+SETS = {"tinystories": ("val", 500, [32, 64]), "wikitext103": ("val", 60, [64, 128]), "tinystoriesmix": ("val", 500, [32, 64]), "wikitext103mix": ("val", 60, [64, 128])}
 GROUPS = {"entropy patching, seeds 0 to 2": ["blt_{}_entropy", "blt_{}_entropy_s1", "blt_{}_entropy_s2"],
-          "fixed stride 4": ["blt_{}_fixed"], "fixed stride 5": ["blt_{}_fixed5"]}
+          "fixed stride 4, seeds 0 to 2": ["blt_{}_fixed", "blt_{}_fixed_s1", "blt_{}_fixed_s2"],
+          "fixed stride 5, seeds 0 to 2": ["blt_{}_fixed5", "blt_{}_fixed5_s1", "blt_{}_fixed5_s2"]}
 PAIRS = [("entropy", "random"), ("entropy", "recency"), ("entropy", "entropy_inv")]
+
+
+def ran(ds: str) -> bool:
+    return (REPO_ROOT / "runs" / f"blt_{ds}_entropy" / "quant_hi4_lo2.json").exists()
 
 
 def load(run: str, split: str, docs: int, name: str = None) -> dict:
@@ -25,6 +30,8 @@ def seeds_table(resamples: int, seed: int) -> str:
     lines = ["Paired BPB difference of keeping high-entropy patches minus the comparison policy (positive means keeping high entropy is worse), "
              f"mean and 95% document bootstrap interval ({resamples} resamples), one row per trained model. Validation only.", ""]
     for ds, (split, docs, budgets) in SETS.items():
+        if not ran(ds):
+            continue
         lines += [f"## {ds}", "", "| Model | Full-cache BPB [95% CI] | Budget | recency BPB | random BPB | entropy BPB | entropy - random | entropy - recency | entropy - entropy_inv |",
                   "|---|---|---|---|---|---|---|---|---|"]
         tally = {}
@@ -65,6 +72,8 @@ ALL = ["recency", "random", "entropy", "entropy_inv"]
 def ablation_table(resamples: int, seed: int) -> str:
     lines = [f"Seed-0 entropy-patched model, validation only, 95% document bootstrap intervals ({resamples} resamples). Differences are keeping high entropy minus the other policy (positive means worse).", ""]
     for ds, (split, docs, budgets) in SETS.items():
+        if not ran(ds):
+            continue
         lines += [f"## {ds}: scoring rule, signal and sink size", "", "| Setting | Budget | recency | random | entropy | entropy_inv | entropy - random | entropy - recency |", "|---|---|---|---|---|---|---|---|"]
         for label, name in ABLATIONS:
             r = load(f"blt_{ds}_entropy", split, docs, name)
@@ -115,6 +124,8 @@ def comparison_table(resamples: int, seed: int) -> str:
     lines = [f"Seed-0 entropy-patched BLT, validation only, 95% document bootstrap intervals ({resamples} resamples). Cache is the mean resident global KV size over positions of a 4,096-byte chunk, "
              "computed from entry counts and bit widths, not measured. Eviction rows keep the first patch and the 8 newest. A row is marked * when no other row has equal or fewer bytes and a strictly lower BPB.", ""]
     for ds, (split, docs, budgets) in SETS.items():
+        if not ran(ds):
+            continue
         r = load(f"blt_{ds}_entropy", split, docs)
         q, qbytes = load_quant(f"blt_{ds}_entropy", "quant_hi4_lo2.json", docs)
         idx = bootstrap_indices(len(r["nbytes"]), resamples, seed)
@@ -153,6 +164,8 @@ def code_table(resamples: int, seed: int) -> str:
              "| Trained on | Full-cache BPB [95% CI] | Mean patch length | Budget | recency | random | entropy | entropy_inv | entropy - random | entropy - recency |", "|---|---|---|---|---|---|---|---|---|---|"]
     for ds in SETS:
         run = f"blt_{ds}_entropy"
+        if not (REPO_ROOT / "runs" / run / "policies_code_200.json").exists():
+            continue
         r = load(run, "val", 200, "policies_code_200.json")
         info = json.loads((REPO_ROOT / "runs" / run / "eval_code_200.json").read_text(encoding="utf-8"))
         idx = bootstrap_indices(len(r["nbytes"]), resamples, seed)
@@ -167,14 +180,98 @@ def code_table(resamples: int, seed: int) -> str:
     return "\n".join(lines)
 
 
+ATTN_RUNS = ["entropy", "entropy_s1", "entropy_s2", "fixed", "fixed5"]
+
+
+def merged(run: str, split: str, docs: int):
+    r = load(run, split, docs)
+    a = load(run, split, docs, "policies_attn.json")
+    if r is None:
+        return None
+    if a is None:
+        return r
+    r["v"].update({k: v for k, v in a["v"].items() if k != "full|0"})
+    return r
+
+
+def attention_table(resamples: int, seed: int) -> str:
+    lines = ["Attention-score baselines against recency, random and keeping high entropy. h2o keeps the patches with the largest accumulated attention received so far "
+             "(averaged over heads and layers); snap uses attention from the last 16 patches only. Scores come from a full-cache pass refined once under the resulting mask, "
+             f"so they approximate online scoring. Validation only, 95% document bootstrap intervals ({resamples} resamples). Differences are the attention policy minus the comparison (negative means the attention policy is better).", ""]
+    for ds, (split, docs, budgets) in SETS.items():
+        lines += [f"## {ds}", "", "| Model | Budget | recency | random | entropy | h2o | snap | h2o - recency | h2o - random | snap - recency | snap - random |", "|---|---|---|---|---|---|---|---|---|---|---|"]
+        for suf in ATTN_RUNS:
+            run = f"blt_{ds}_{suf}"
+            r = merged(run, split, docs)
+            if r is None:
+                continue
+            idx = bootstrap_indices(len(r["nbytes"]), resamples, seed)
+            for b in budgets:
+                cells = []
+                for a, c in (("h2o", "recency"), ("h2o", "random"), ("snap", "recency"), ("snap", "random")):
+                    m, l, h = paired_diff_ci(r["v"][f"{a}|{b}"], r["v"][f"{c}|{b}"], r["nbytes"], idx)
+                    cells.append(f"{m:+.4f} [{l:+.4f}, {h:+.4f}]")
+                lines.append(f"| {run} | {b} | " + " | ".join(f"{bpb(r['v'][f'{p}|{b}'], r['nbytes']):.4f}" for p in ("recency", "random", "entropy", "h2o", "snap")) + " | " + " | ".join(cells) + " |")
+        lines.append("")
+    return "\n".join(lines)
+
+
+LONG = [("blt_wikitext103mix_entropy", "4,096 bytes", [64, 128]), ("blt_wikitext103mix_L16k_entropy", "16,384 bytes", [64, 128, 256, 512]),
+        ("blt_wikitext103mix_fixed", "4,096 bytes", [64, 128]), ("blt_wikitext103mix_L16k_fixed", "16,384 bytes", [64, 128, 256, 512])]
+
+
+def long_table(resamples: int, seed: int) -> str:
+    lines = ["WikiText-103 validation (60 documents) with the code-mix models trained and evaluated with 4,096-byte chunks (the main models) or 16,384-byte chunks (L16k, same bytes seen in training). "
+             f"Documents have a mean length of about 19,000 bytes, so 16,384-byte chunks cover most of a document. 95% document bootstrap intervals ({resamples} resamples). Differences are the first policy minus the second.", "",
+             "| Model | Chunk | Full BPB [95% CI] | Budget | recency | random | entropy | h2o | snap | entropy - random | h2o - recency | snap - recency |", "|---|---|---|---|---|---|---|---|---|---|---|---|"]
+    for run, chunk, budgets in LONG:
+        r = merged(run, "val", 60)
+        if r is None:
+            continue
+        idx = bootstrap_indices(len(r["nbytes"]), resamples, seed)
+        lo, hi = bootstrap_ci(r["v"]["full|0"], r["nbytes"], idx)
+        for b in budgets:
+            if f"entropy|{b}" not in r["v"]:
+                continue
+            cells = []
+            for a, c in (("entropy", "random"), ("h2o", "recency"), ("snap", "recency")):
+                m, l, h = paired_diff_ci(r["v"][f"{a}|{b}"], r["v"][f"{c}|{b}"], r["nbytes"], idx)
+                cells.append(f"{m:+.4f} [{l:+.4f}, {h:+.4f}]")
+            lines.append(f"| {run} | {chunk} | {bpb(r['v']['full|0'], r['nbytes']):.4f} [{lo:.4f}, {hi:.4f}] | {b} | "
+                         + " | ".join(f"{bpb(r['v'][f'{p}|{b}'], r['nbytes']):.4f}" for p in ("recency", "random", "entropy", "h2o", "snap")) + " | " + " | ".join(cells) + " |")
+    return "\n".join(lines)
+
+
+def test_table(resamples: int, seed: int) -> str:
+    lines = ["WikiText-103 test split (62 documents), evaluated once with the policies and budgets fixed on validation. Models are the three seeds of entropy patching and of fixed strides 4 and 5, "
+             f"without and with the 15% code mix. 95% document bootstrap intervals ({resamples} resamples). Differences are the first policy minus the second (negative means the first is better).", "",
+             "| Model | Full BPB [95% CI] | Budget | recency | random | entropy | h2o | snap | entropy - random | entropy - recency | snap - recency |", "|---|---|---|---|---|---|---|---|---|---|---|"]
+    for ds in ("wikitext103", "wikitext103mix"):
+        for suf in ["entropy", "entropy_s1", "entropy_s2", "fixed", "fixed_s1", "fixed_s2", "fixed5", "fixed5_s1", "fixed5_s2"]:
+            run = f"blt_{ds}_{suf}"
+            r = load(run, "test", 62)
+            if r is None:
+                continue
+            idx = bootstrap_indices(len(r["nbytes"]), resamples, seed)
+            lo, hi = bootstrap_ci(r["v"]["full|0"], r["nbytes"], idx)
+            for b in (64, 128):
+                cells = []
+                for a, c in (("entropy", "random"), ("entropy", "recency"), ("snap", "recency")):
+                    m, l, h = paired_diff_ci(r["v"][f"{a}|{b}"], r["v"][f"{c}|{b}"], r["nbytes"], idx)
+                    cells.append(f"{m:+.4f} [{l:+.4f}, {h:+.4f}]")
+                lines.append(f"| {run} | {bpb(r['v']['full|0'], r['nbytes']):.4f} [{lo:.4f}, {hi:.4f}] | {b} | "
+                             + " | ".join(f"{bpb(r['v'][f'{p}|{b}'], r['nbytes']):.4f}" for p in ("recency", "random", "entropy", "h2o", "snap")) + " | " + " | ".join(cells) + " |")
+    return "\n".join(lines)
+
+
 def main():
     p = argparse.ArgumentParser()
-    p.add_argument("table", choices=["seeds", "ablations", "table", "code"])
+    p.add_argument("table", choices=["seeds", "ablations", "table", "code", "attention", "long", "test"])
     p.add_argument("--resamples", type=int, default=2000)
     p.add_argument("--seed", type=int, default=0)
     p.add_argument("--out", default=None)
     args = p.parse_args()
-    text = {"seeds": seeds_table, "ablations": ablation_table, "table": comparison_table, "code": code_table}[args.table](args.resamples, args.seed)
+    text = {"seeds": seeds_table, "ablations": ablation_table, "table": comparison_table, "code": code_table, "attention": attention_table, "long": long_table, "test": test_table}[args.table](args.resamples, args.seed)
     print(text)
     if args.out:
         (REPO_ROOT / args.out).parent.mkdir(parents=True, exist_ok=True)

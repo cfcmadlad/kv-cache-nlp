@@ -16,6 +16,10 @@ Added since: seed 1 and 2 configs and a fixed-stride-5 control (`scripts/run_see
 
 Done on the cluster: three seeds, stride-5 control, ablations (own entropy, scoring rules, sink, byte-level), policy evaluation rerun after an accounting fix, code dataset built and verified. Tables: `results/part3/` (`seeds.md`, `ablations.md`, `comparison.md`, `code_domain.md`). Written: `docs/results_summary.md`, `docs/phase_6_ablations.md`, `docs/report_part3.md`, `docs/viva_notes.md` (collated). Phase 8 demo done and tested from a clean copy. Code-mix WikiText models trained and evaluated (`scripts/run_mix.sh`). Open: Block 2.0 requeue test, release asset delivery for the demo, Part 1 and 2 gaps, test split evaluation (once per final configuration), attention analysis on more seeds.
 
+## Status on 22 Oct
+
+Done on the cluster since the last status: three seeds for every patching scheme (entropy, fixed strides 4 and 5) in all four settings (TinyStories and WikiText, with and without the 15 percent code mix) and for the byte-level model; TinyStories retrained with code; H2O and SnapKV-style policies (offline scoring) on every model; 16,384-byte models; quantization and attention analysis on all seeds; the WikiText test split once (18 models); the SIGUSR1 requeue and resume path seen across two jobs. Tables: `results/part3/` (`seeds.md`, `ablations.md`, `comparison.md`, `code_domain.md`, `attention_policies.md`, `long_context.md`, `test_split.md`). Text: `docs/results_summary.md`, `docs/report_part3.md`, `docs/phase_6_ablations.md`, `docs/viva_notes.md`. Needs the user: upload of the `v0.3-part3` release asset (zip built by `part3_assets.py build`; the demo's Part 3 option needs it), Part 1 and Part 2 gaps in `CHALLENGES.md`, revoking the HF token pasted in chat. Possible further work, not started: an online (step-decoding) H2O and SnapKV, a tuned 16k run, more seeds for the ablations.
+
 ## Phase 2: byte models (21 Oct to 31 Oct)
 
 | Block | Dates | Done when | Rubric |

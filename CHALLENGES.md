@@ -125,4 +125,32 @@ Outcome: corrected; shares in `docs/results_summary.md` are the fixed ones.
 Problem: the code set was gated; once built (28,229 files) the prose-trained models scored 7 to 8 BPB on it, so the first code evaluation said nothing.
 Impact: needed a code-mixed training run, after the main tables existed.
 Strategy: added a mix option to the entropy and BLT trainers (15 percent of each batch from code, tested), retrained the WikiText entropy model, three BLT seeds and two fixed-stride controls on the cluster in 42 minutes, and redid the WikiText tables.
-Outcome: done for WikiText only. The mix costs about 0.05 BPB on WikiText, the eviction conclusion is unchanged but smaller, and the attention explanation did not carry over (see `docs/results_summary.md`). TinyStories was not retrained with code.
+Outcome: done for WikiText first, then TinyStories (`scripts/run_tsmix.sh`). The mix costs about 0.05 BPB on WikiText and 0.09 on TinyStories, and the eviction conclusion is unchanged but smaller.
+
+### One seed gave a wrong mechanism, then a wrong retraction
+
+Problem: the seed-0 code-mix WikiText model showed small positive attention-entropy correlations, which I took to weaken the explanation that old high-entropy patches are rarely attended. With seeds 1 and 2 and the TinyStories code-mix model the negative correlation in the middle and upper layers is back, and seed 0 is the outlier.
+Impact: the summary was briefly changed on the strength of one seed.
+Strategy: ran the attention analysis on every available seed (`scripts/run_controls.sh`) before changing the text.
+Outcome: the explanation is kept with the caveat that it is a correlation and that one model contradicts it.
+
+### A dependency between run scripts cost a cluster job
+
+Problem: the extra-runs chain evaluated the TinyStories code-mix control models before the script that builds their entropy cache had run; the job failed with a missing file after several hours.
+Impact: some queue time; no data lost, because every script skips finished runs.
+Strategy: reordered the chain (code-mix first) and resubmitted; added no new check, since the scripts already resume.
+Outcome: all runs completed.
+
+### The attention-score baselines are approximations
+
+Problem: H2O and SnapKV score cache entries with attention computed while decoding with the evicted cache. My simulation applies one mask to a whole chunk, so the scores come from a full-cache pass refined once under the resulting mask.
+Impact: absolute numbers for h2o and snap may differ from an online implementation; the comparison with recency is still on the same data and mask machinery.
+Strategy: stated the approximation in the results and tests; did not claim step-decoding equivalence for these two policies.
+Outcome: open; an online version needs per-step score updates in the step API.
+
+### The requeue test was blocked by the one-job limit
+
+Problem: a 7-minute smoke job received SIGUSR1, saved its checkpoint, wrote the PREEMPTED marker and was requeued, but the requeued attempt waited behind the main chain (one GPU job per user) and would have looped on every requeue.
+Impact: the full cycle could not be seen under one job id.
+Strategy: cancelled the held job, then submitted a second smoke job into the same run directory once the queue was empty; it printed "resumed at step 1" from the checkpoint written by the signalled job.
+Outcome: preempt, requeue and resume are each seen on the cluster, across two job ids (see `docs/results_summary.md`).

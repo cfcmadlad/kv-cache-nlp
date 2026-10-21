@@ -22,13 +22,15 @@ def test_policy_eval_end_to_end(tmp_path, monkeypatch):
     monkeypatch.setattr(eval_policies, "REPO_ROOT", root)
     torch.manual_seed(0)
     model = BLT(**cfg["model"]).eval()
-    args = type("A", (), dict(run="x", split="val", max_docs=None, policies=["recency", "random", "entropy"], budgets=[8, 24, 10_000],
-                              sink=1, recent=2, agg="mean", seed=0, random_seeds=2, entropy_run=None, signal="entropy_model", dataset=None))
+    args = type("A", (), dict(run="x", split="val", max_docs=None, policies=["recency", "random", "entropy", "h2o", "snap"], budgets=[8, 24, 10_000],
+                              sink=1, recent=2, agg="mean", seed=0, random_seeds=2, entropy_run=None, signal="entropy_model", dataset=None, attn_iters=2, snap_window=4))
     out = eval_policies.run(model, cfg, args, "cpu")
     v = out["variants"]
     assert out["docs"] == len(DOCS) and set(v) >= {"full|0", "recency|8", "random|24", "entropy|10000"}
     assert np.allclose(v["entropy|10000"]["nats"], v["full|0"]["nats"])
     assert not np.allclose(v["recency|8"]["nats"], v["full|0"]["nats"])
+    assert v["h2o|8"]["mean_entries"] <= 8 and v["snap|24"]["mean_entries"] <= 24
+    assert np.allclose(v["h2o|10000"]["nats"], v["full|0"]["nats"])
     assert v["recency|8"]["mean_entries"] <= 8 < v["full|0"]["mean_entries"]
     json.dumps(out)
 

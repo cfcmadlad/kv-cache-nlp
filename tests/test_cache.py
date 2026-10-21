@@ -2,7 +2,7 @@ import numpy as np
 import pytest
 import torch
 
-from kvc.cache import Policy, evict_one, mean_cache_entries, patch_entropy_scores, patch_scores, visible_mask
+from kvc.cache import Policy, attention_scores, evict_one, mean_cache_entries, patch_entropy_scores, patch_scores, visible_mask
 from models.blt import BLT
 from models.entropy import BOS
 from test_blt import SMALL
@@ -89,3 +89,18 @@ def test_entropy_policy_keeps_high_entropy_patches():
     assert mask[-1, 7] and mask[-1, 11]
     inv = visible_mask(30, -scores, Policy("entropy_inv", budget=8, sink=1, recent=3))
     assert not inv[-1, 7] and not inv[-1, 11]
+
+
+def test_attention_scores_accumulate_and_window():
+    attn = np.tril(np.ones((6, 6)))
+    h2o = attention_scores(attn, "h2o", 2)
+    assert h2o[3, 0] == 4 and h2o[5, 5] == 1 and h2o[2, 3] == 0
+    snap = attention_scores(attn, "snap", 2)
+    assert snap[5, 0] == 2 and snap[0, 0] == 1
+
+
+def test_dynamic_scores_pick_row_per_step():
+    scores = np.zeros((8, 8))
+    scores[:, 3] = 5.0
+    mask = visible_mask(8, scores, Policy("h2o", budget=4, sink=1, recent=2))
+    assert mask[7, 3] and mask[7].sum() == 4

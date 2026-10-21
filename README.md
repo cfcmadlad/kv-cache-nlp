@@ -5,7 +5,7 @@ CS F429 Natural Language Processing, BITS Pilani Hyderabad, Group 12.
 
 Byte-level models read raw UTF-8, so a sentence spans about four times as many positions as in BPE tokens, and the KV cache grows with it. The Byte Latent Transformer (BLT) already computes next-byte entropy to place patch boundaries. This project tests whether that same entropy can decide which cache entries to evict or quantize, compared with recency (StreamingLLM), attention-score methods (H2O, SnapKV) and random eviction at an equal number of cache bytes.
 
-Part 2 (done) built the data pipeline and two baselines scored in bits per byte (BPB). Part 3 (in progress) adds the byte-level model, the cache policies and their evaluation. Headline so far, on one seed and small models: using next-byte entropy as the keep signal is negative. Keeping high-entropy patches, or giving them more bits, does worse than random and recency at the same cache bytes, and uniform 4-bit KV is within 0.001 BPB of fp16 at 27 percent of the bytes. See `docs/results_summary.md`.
+Part 2 (done) built the data pipeline and two baselines scored in bits per byte (BPB). Part 3 adds the byte-level model, the cache policies and their evaluation. Headline, on small models with three seeds each: using next-byte entropy as the keep signal is negative. Keeping high-entropy patches, or giving them more bits, does worse than random and recency at the same cache bytes in 68 to 70 of 72 comparisons and better in none, and uniform 4-bit KV is within 0.0014 BPB of fp16 at 27 percent of the bytes. An attention-based rule (SnapKV-style, scored offline) beats recency by 0.0001 to 0.0069 BPB. See `docs/results_summary.md`.
 
 ## Baseline results
 
@@ -90,6 +90,14 @@ python scripts/compare.py code --out results/part3/code_domain.md
 python scripts/collate_viva.py
 ```
 
-Seeds, ablations, the comparison table and the report text are done (cluster runs, `slurm/job.sbatch`); tables are in `results/part3/` and the report draft is `docs/report_part3.md`. The WikiText models were also retrained with a 15 percent code mix (`bash scripts/run_mix.sh`). Not done: the Block 2.0 requeue test, the test split. Details in `PLAN.md`.
+Extra runs, all on the cluster (`bash scripts/run_tsmix.sh`, `run_controls.sh`, `run_long.sh`, `run_attn_policies.sh`, chained by `run_extra.sh`; the test split by `run_test.sh`):
+
+```bash
+python scripts/compare.py attention --out results/part3/attention_policies.md
+python scripts/compare.py long --out results/part3/long_context.md
+python scripts/compare.py test --out results/part3/test_split.md
+```
+
+Seeds, ablations, the comparison table, attention baselines, the longer context and the report text are done (tables in `results/part3/`, report draft `docs/report_part3.md`). Not done: the resume half of the Block 2.0 requeue test on the cluster. Details in `PLAN.md`.
 
 Plan in `PLAN.md`, related work in `NOVELTY.md`, problems in `CHALLENGES.md`, per-block notes and results in `docs/`.

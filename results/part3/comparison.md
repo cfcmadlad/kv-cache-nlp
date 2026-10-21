@@ -88,6 +88,48 @@ Seed-0 entropy-patched BLT, validation only, 95% document bootstrap intervals (2
 | evict to 512 patches, entropy_inv | 3,105 | 82% | 1.6806 [1.6396, 1.7204] | +0.0005 |
 | full cache fp16 | 3,777 | 100% | 1.6801 [1.6394, 1.7199] | +0.0000 |
 
+## tinystoriesmix (full-cache BPB 0.9019)
+
+| Setting | Mean KV cache (KB) | Share of full | BPB [95% CI] | Cost over full |
+|---|---|---|---|---|
+| evict to 12 patches, recency | 107 | 13% | 0.9213 [0.9073, 0.9356] | +0.0194 |
+| evict to 12 patches, random | 107 | 13% | 0.9201 [0.9059, 0.9345] | +0.0181 |
+| evict to 12 patches, entropy | 107 | 13% | 0.9246 [0.9108, 0.9391] | +0.0227 |
+| evict to 12 patches, entropy_inv * | 107 | 13% | 0.9144 [0.9003, 0.9289] | +0.0125 |
+| uniform 2 bits | 112 | 14% | 0.9315 [0.9178, 0.9458] | +0.0296 |
+| tiers 4/2 bit, keep low entropy 0.125 high | 121 | 15% | 0.9270 [0.9132, 0.9412] | +0.0251 |
+| tiers 4/2 bit, random 0.125 high | 126 | 16% | 0.9277 [0.9138, 0.9420] | +0.0258 |
+| tiers 4/2 bit, keep high entropy 0.125 high | 127 | 16% | 0.9297 [0.9159, 0.9441] | +0.0278 |
+| tiers 4/2 bit, keep low entropy 0.25 high | 131 | 16% | 0.9235 [0.9095, 0.9376] | +0.0215 |
+| tiers 4/2 bit, recent 0.125 high * | 137 | 17% | 0.9050 [0.8911, 0.9192] | +0.0031 |
+| tiers 4/2 bit, random 0.25 high | 138 | 17% | 0.9251 [0.9112, 0.9393] | +0.0231 |
+| tiers 4/2 bit, keep high entropy 0.25 high | 140 | 18% | 0.9276 [0.9138, 0.9419] | +0.0256 |
+| evict to 16 patches, recency | 140 | 18% | 0.9163 [0.9023, 0.9305] | +0.0143 |
+| evict to 16 patches, random | 140 | 18% | 0.9150 [0.9008, 0.9295] | +0.0130 |
+| evict to 16 patches, entropy | 140 | 18% | 0.9224 [0.9084, 0.9369] | +0.0205 |
+| evict to 16 patches, entropy_inv | 140 | 18% | 0.9102 [0.8961, 0.9247] | +0.0082 |
+| tiers 4/2 bit, recent 0.25 high * | 157 | 20% | 0.9042 [0.8904, 0.9184] | +0.0023 |
+| tiers 4/2 bit, keep low entropy 0.5 high | 158 | 20% | 0.9143 [0.9004, 0.9286] | +0.0123 |
+| uniform 3 bits | 162 | 20% | 0.9047 [0.8909, 0.9190] | +0.0028 |
+| tiers 4/2 bit, random 0.5 high | 163 | 20% | 0.9180 [0.9042, 0.9322] | +0.0160 |
+| tiers 4/2 bit, keep high entropy 0.5 high | 170 | 21% | 0.9203 [0.9063, 0.9348] | +0.0183 |
+| tiers 4/2 bit, recent 0.5 high * | 187 | 24% | 0.9034 [0.8895, 0.9175] | +0.0014 |
+| uniform 4 bits * | 212 | 27% | 0.9024 [0.8886, 0.9165] | +0.0005 |
+| evict to 32 patches, recency | 264 | 33% | 0.9091 [0.8953, 0.9234] | +0.0072 |
+| evict to 32 patches, random | 264 | 33% | 0.9074 [0.8934, 0.9218] | +0.0054 |
+| evict to 32 patches, entropy | 264 | 33% | 0.9167 [0.9025, 0.9312] | +0.0147 |
+| evict to 32 patches, entropy_inv | 264 | 33% | 0.9055 [0.8915, 0.9198] | +0.0035 |
+| uniform 8 bits * | 411 | 52% | 0.9019 [0.8881, 0.9160] | +0.0000 |
+| evict to 64 patches, recency | 466 | 58% | 0.9044 [0.8906, 0.9184] | +0.0024 |
+| evict to 64 patches, random | 466 | 58% | 0.9036 [0.8898, 0.9177] | +0.0017 |
+| evict to 64 patches, entropy | 466 | 58% | 0.9090 [0.8947, 0.9234] | +0.0071 |
+| evict to 64 patches, entropy_inv | 466 | 58% | 0.9035 [0.8896, 0.9177] | +0.0016 |
+| evict to 128 patches, recency | 689 | 86% | 0.9022 [0.8883, 0.9162] | +0.0002 |
+| evict to 128 patches, random | 689 | 86% | 0.9022 [0.8884, 0.9163] | +0.0003 |
+| evict to 128 patches, entropy | 689 | 86% | 0.9040 [0.8899, 0.9184] | +0.0021 |
+| evict to 128 patches, entropy_inv | 689 | 86% | 0.9024 [0.8885, 0.9166] | +0.0004 |
+| full cache fp16 * | 797 | 100% | 0.9019 [0.8881, 0.9160] | +0.0000 |
+
 ## wikitext103mix (full-cache BPB 1.7190)
 
 | Setting | Mean KV cache (KB) | Share of full | BPB [95% CI] | Cost over full |
