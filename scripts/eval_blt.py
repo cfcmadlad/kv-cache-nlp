@@ -45,13 +45,15 @@ def main():
     p = argparse.ArgumentParser()
     p.add_argument("--run", required=True)
     p.add_argument("--split", default="val")
+    p.add_argument("--dataset", default=None)
     p.add_argument("--max-docs", type=int, default=None)
     p.add_argument("--out", default=None)
     args = p.parse_args()
     device = "cuda" if torch.cuda.is_available() else "cpu"
     model, cfg = load_blt(args.run, device)
     ps = patch_settings(cfg)
-    base = REPO_ROOT / "data" / "bytes" / cfg["dataset"]
+    dataset = args.dataset or cfg["dataset"]
+    base = REPO_ROOT / "data" / "bytes" / dataset
     data, offsets = open_split(base, args.split)
     entropy = None
     if ps["mode"] == "entropy":
@@ -65,7 +67,7 @@ def main():
         h = None if entropy is None else entropy[s:e].astype(np.float32)
         dn, dp = score_doc(model, np.asarray(data[s:e]), h, ps, cfg["block"], device)
         nats, patches, bytes_ = nats + dn, patches + dp, bytes_ + int(e - s)
-    result = {"run": args.run, "dataset": cfg["dataset"], "split": args.split, "docs": count, "bytes": bytes_,
+    result = {"run": args.run, "dataset": dataset, "split": args.split, "docs": count, "bytes": bytes_,
               "bpb": round(nats / math.log(2) / bytes_, 4), "patching": ps["mode"],
               "mean_patch_len": round(bytes_ / patches, 3),
               "global_cache_bytes_per_1000": round(1000 * patches / bytes_ * GLOBAL_CACHE_BYTES_PER_PATCH(cfg["model"]))}

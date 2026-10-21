@@ -76,15 +76,20 @@ python -m pytest
 
 Demo on a CPU laptop (option 4 of `scripts/demo.py` runs the policies and quantization on any text): `python scripts/fetch_assets.py`, then `run.bat` or `./run.sh`. Option 4 fetches the Part 3 models on first use with `scripts/part3_assets.py fetch`; the release asset `v0.3-part3` is built by `scripts/part3_assets.py build` and still has to be uploaded.
 
-Seeds, control and ablations (GPU, run one at a time; each script resumes finished runs):
+Seeds, control and ablations (run on the cluster with `sbatch slurm/job.sbatch bash scripts/<name>.sh`; each resumes finished runs):
 
 ```bash
 bash scripts/run_seeds.sh
 bash scripts/run_ablations.sh
+bash scripts/run_policies.sh
+bash scripts/run_code_eval.sh
 python scripts/compare.py seeds --out results/part3/seeds.md
+python scripts/compare.py ablations --out results/part3/ablations.md
+python scripts/compare.py table --out results/part3/comparison.md
+python scripts/compare.py code --out results/part3/code_domain.md
 python scripts/collate_viva.py
 ```
 
-Status: seeds and ablations are in progress on the laptop GPU; Block 2.0 cluster verification, the code dataset and the final comparison and report are not done. Details in `PLAN.md`.
+Seeds, ablations, the comparison table and the report text are done (cluster runs, `slurm/job.sbatch`); tables are in `results/part3/` and the report draft is `docs/report_part3.md`. The WikiText models were also retrained with a 15 percent code mix (`bash scripts/run_mix.sh`). Not done: the Block 2.0 requeue test, the test split. Details in `PLAN.md`.
 
 Plan in `PLAN.md`, related work in `NOVELTY.md`, problems in `CHALLENGES.md`, per-block notes and results in `docs/`.

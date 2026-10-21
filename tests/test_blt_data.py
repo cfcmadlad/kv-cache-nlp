@@ -52,3 +52,21 @@ def test_blt_trains_on_batcher_output(tmp_path):
         opt.step()
         losses.append(loss.item())
     assert losses[-1] < losses[0] - 0.3
+
+
+def test_mixed_batches_draw_from_both_sources(tmp_path):
+    import train_entropy
+    write_split(DOCS, tmp_path / "a", "train")
+    write_split(["Z" * 90] * 30, tmp_path / "b", "train")
+    data, offsets = open_split(tmp_path / "a", "train")
+    mix = open_split(tmp_path / "b", "train")
+    c = {**cfg("fixed"), "batch_size": 64, "mix": {"frac": 0.5}}
+    (x, flags), y = batcher(data, offsets, None, c, (*mix, None))(0)
+    from_mix = (x == ord("Z")).any(1)
+    assert 10 < from_mix.sum() < 54 and (x[from_mix][(x[from_mix] != BOS)] == ord("Z")).all()
+    assert flags[:, 0].all()
+    none = batcher(data, offsets, None, {**c, "mix": {"frac": 0.0}}, (*mix, None))(0)[0][0]
+    assert not (none == ord("Z")).any()
+    ex, ey = train_entropy.batcher(data, offsets, 64, 64, 0, mix, 0.5)(0)
+    assert 10 < (ex == ord("Z")).any(1).sum() < 54
+    assert not (train_entropy.batcher(data, offsets, 64, 64, 0)(0)[0] == ord("Z")).any()

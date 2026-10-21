@@ -112,3 +112,17 @@ Problem: the first extra seed of the TinyStories entropy-patched model has full-
 Impact: the 3.3 percent gap between entropy patching and fixed stride in `docs/results_summary.md` is within about two seed spreads and is not established. The eviction sign comparisons are paired on the same model and are not affected.
 Strategy: three seeds for the entropy-patched models and a stride-5 control; report per-seed numbers.
 Outcome: in progress.
+
+### Cache size accounting error in the policy evaluation
+
+Problem: `eval_policies.py` counted a full-cache chunk as P entries but a masked chunk as the mean of the mask row sums, about (P + 1) / 2, so full-cache bytes were doubled.
+Impact: the shares of full cache bytes first quoted for eviction budgets (16 percent for 32 TinyStories patches, 7 percent for 64 WikiText patches) were half the true shares (32 and 15 percent). BPB values were not affected; the quantization tables used correct accounting.
+Strategy: found when the comparison table put eviction and quantization rows side by side and the full-cache sizes disagreed (1,669 KB against 839 KB). Fixed the accounting, reran the policy evaluations on the cluster (`scripts/run_policies.sh`), regenerated every table; the BPB values matched the laptop runs exactly.
+Outcome: corrected; shares in `docs/results_summary.md` are the fixed ones.
+
+### Code dataset arrived late and the prose models cannot read it
+
+Problem: the code set was gated; once built (28,229 files) the prose-trained models scored 7 to 8 BPB on it, so the first code evaluation said nothing.
+Impact: needed a code-mixed training run, after the main tables existed.
+Strategy: added a mix option to the entropy and BLT trainers (15 percent of each batch from code, tested), retrained the WikiText entropy model, three BLT seeds and two fixed-stride controls on the cluster in 42 minutes, and redid the WikiText tables.
+Outcome: done for WikiText only. The mix costs about 0.05 BPB on WikiText, the eviction conclusion is unchanged but smaller, and the attention explanation did not carry over (see `docs/results_summary.md`). TinyStories was not retrained with code.

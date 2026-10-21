@@ -12,6 +12,10 @@ Done and tested: 2.1 (except the code dataset, which is gated), 2.2, 2.3, 2.4 (f
 
 Added since: seed 1 and 2 configs and a fixed-stride-5 control (`scripts/run_seeds.sh`; seed 1 of TinyStories entropy done and the sign holds), ablation tooling (`--signal own`, `--agg first|sum`, sink size, byte-level model with stride 1; `scripts/run_ablations.sh`), the Part 3 demo (option 4, `scripts/part3_assets.py`, tested from a clean copy on CPU), `scripts/compare.py seeds` and `scripts/collate_viva.py`. Waiting on the GPU queue: remaining seeds, ablations. Needs the HPC or the user: Block 2.0 verification, code dataset, upload of the `v0.3-part3` release asset (zip built by `part3_assets.py build`, SHA-256 already in the script), Part 1 and 2 gaps. Phase 9 tables and report text come after the runs finish.
 
+## Status on 21 Oct (night)
+
+Done on the cluster: three seeds, stride-5 control, ablations (own entropy, scoring rules, sink, byte-level), policy evaluation rerun after an accounting fix, code dataset built and verified. Tables: `results/part3/` (`seeds.md`, `ablations.md`, `comparison.md`, `code_domain.md`). Written: `docs/results_summary.md`, `docs/phase_6_ablations.md`, `docs/report_part3.md`, `docs/viva_notes.md` (collated). Phase 8 demo done and tested from a clean copy. Code-mix WikiText models trained and evaluated (`scripts/run_mix.sh`). Open: Block 2.0 requeue test, release asset delivery for the demo, Part 1 and 2 gaps, test split evaluation (once per final configuration), attention analysis on more seeds.
+
 ## Phase 2: byte models (21 Oct to 31 Oct)
 
 | Block | Dates | Done when | Rubric |

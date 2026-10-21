@@ -17,7 +17,8 @@ from train_blt import patch_settings
 @torch.no_grad()
 def run(model, cfg, args, device):
     ps = patch_settings(cfg)
-    base = REPO_ROOT / "data" / "bytes" / cfg["dataset"]
+    dataset = args.dataset or cfg["dataset"]
+    base = REPO_ROOT / "data" / "bytes" / dataset
     data, offsets = open_split(base, args.split)
     entropy_run = args.entropy_run or cfg["patching"]["entropy_run"]
     entropy = np.load(base / f"entropy_{entropy_run}" / f"{args.split}.npy", mmap_mode="r")
@@ -52,7 +53,7 @@ def run(model, cfg, args, device):
                 mode, budget = v
                 if mode == "full" or budget >= P:
                     nats[v][di] += chunk_full
-                    entries[v].append(P)
+                    entries[v].append((P + 1) / 2)
                     continue
                 pol = Policy(mode, budget, args.sink, args.recent, args.agg, args.seed)
                 reps = args.random_seeds if mode == "random" else 1
@@ -65,7 +66,7 @@ def run(model, cfg, args, device):
                 nats[v][di] += total / reps
                 entries[v].append(mean_cache_entries(mask))
     per_patch = GLOBAL_CACHE_BYTES_PER_PATCH(cfg["model"])
-    return {"run": args.run, "dataset": cfg["dataset"], "split": args.split, "docs": len(docs),
+    return {"run": args.run, "dataset": dataset, "split": args.split, "docs": len(docs),
             "bytes_per_doc": sizes.tolist(), "bytes_per_patch": per_patch,
             "settings": {"sink": args.sink, "recent": args.recent, "agg": args.agg, "seed": args.seed,
                          "random_seeds": args.random_seeds, "entropy_run": entropy_run, "signal": args.signal},
@@ -78,6 +79,7 @@ def main():
     p = argparse.ArgumentParser()
     p.add_argument("--run", required=True)
     p.add_argument("--split", default="val")
+    p.add_argument("--dataset", default=None)
     p.add_argument("--max-docs", type=int, default=None)
     p.add_argument("--policies", nargs="+", default=["recency", "random", "entropy", "entropy_inv"])
     p.add_argument("--budgets", nargs="+", type=int, default=[16, 32, 64, 128, 256, 512])

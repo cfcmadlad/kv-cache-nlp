@@ -1,6 +1,6 @@
 blt_tinystories_entropy on tinystories val (500 docs, 405,231 bytes), 2000 document bootstrap resamples, 95% intervals.
 
-Full cache: BPB 0.7980 [0.7846, 0.8114], 1,669.3 KB mean global cache per chunk
+Full cache: BPB 0.7980 [0.7846, 0.8114], 839.2 KB mean global cache per chunk
 
 | Policy | Budget (patches) | Mean cache KB | BPB [95% CI] | Cost over full |
 |---|---|---|---|---|
@@ -16,14 +16,14 @@ Full cache: BPB 0.7980 [0.7846, 0.8114], 1,669.3 KB mean global cache per chunk
 | entropy_inv | 32 | 265.9 | 0.8089 [0.7951, 0.8226] | +0.0109 |
 | random | 32 | 265.9 | 0.8115 [0.7976, 0.8250] | +0.0135 |
 | recency | 32 | 265.9 | 0.8078 [0.7944, 0.8213] | +0.0098 |
-| entropy | 64 | 472.8 | 0.8109 [0.7968, 0.8248] | +0.0129 |
-| entropy_inv | 64 | 472.8 | 0.8026 [0.7890, 0.8163] | +0.0046 |
-| random | 64 | 472.8 | 0.8033 [0.7897, 0.8169] | +0.0053 |
-| recency | 64 | 472.8 | 0.8016 [0.7884, 0.8152] | +0.0036 |
-| entropy | 128 | 802.3 | 0.8020 [0.7880, 0.8158] | +0.0040 |
-| entropy_inv | 128 | 802.3 | 0.7993 [0.7856, 0.8129] | +0.0013 |
-| random | 128 | 802.3 | 0.7993 [0.7857, 0.8128] | +0.0012 |
-| recency | 128 | 802.3 | 0.7987 [0.7854, 0.8123] | +0.0007 |
+| entropy | 64 | 472.0 | 0.8109 [0.7968, 0.8248] | +0.0129 |
+| entropy_inv | 64 | 472.0 | 0.8026 [0.7890, 0.8163] | +0.0046 |
+| random | 64 | 472.0 | 0.8033 [0.7897, 0.8169] | +0.0053 |
+| recency | 64 | 472.0 | 0.8016 [0.7884, 0.8152] | +0.0036 |
+| entropy | 128 | 711.9 | 0.8020 [0.7880, 0.8158] | +0.0040 |
+| entropy_inv | 128 | 711.9 | 0.7993 [0.7856, 0.8129] | +0.0013 |
+| random | 128 | 711.9 | 0.7993 [0.7857, 0.8128] | +0.0012 |
+| recency | 128 | 711.9 | 0.7987 [0.7854, 0.8123] | +0.0007 |
 
 Paired BPB difference (first minus second, negative means the first is better), mean [95% CI]:
 
