@@ -3,7 +3,7 @@ import torch
 import torch.nn as nn
 import torch.nn.functional as F
 
-from kvc.cache import Policy, QuantPolicy, evict_one, insertion_hi, tier_row
+from kvc.cache import ATTN_MODES, Policy, QuantPolicy, evict_one, insertion_hi, tier_row
 from kvc.quant import fake_quant
 from models.entropy import BOS, Block
 from models.rope import apply_rope, rope_cache
@@ -49,6 +49,8 @@ class GlobalAttention(nn.Module):
             k, v = torch.cat([old_k, k], 2), torch.cat([old_v, v], 2)
         cache["k"], cache["v"] = k, v
         B, _, C = x.shape
+        if self.record is not None:
+            self.record.append(torch.softmax(q @ k.transpose(-1, -2) * q.size(-1) ** -0.5, -1).mean(1)[0, 0])
         if tier is not None:
             hi_row, hb, lb = tier
             hi = hi_row[None, None, :, None]
@@ -97,10 +99,7 @@ class BLT(nn.Module):
             if isinstance(m, nn.Linear) and m.bias is not None:
                 nn.init.zeros_(m.bias)
 
-    def forward(self, inputs, targets=None):
-        idx, nxt, *extra = inputs
-        keep = extra[0] if extra else None
-        tier = extra[1] if len(extra) > 1 else None
+    def _local_in(self, idx, nxt):
         B, N = idx.shape
         nxt = nxt.long()
         doc = (idx == BOS).cumsum(1)
@@ -116,9 +115,9 @@ class BLT(nn.Module):
         count = torch.zeros(B, P, device=idx.device, dtype=e.dtype).scatter_add(1, patch_in, torch.ones_like(patch_in, dtype=e.dtype))
         patch_doc = torch.zeros(B, P, dtype=doc.dtype, device=idx.device).scatter_reduce(1, patch_in, doc, "amax")
         g = self.pool(pooled / count.clamp(min=1)[..., None])
-        gcos, gsin = rope_cache(torch.arange(P, device=idx.device), self.global_head_dim)
-        for block in self.glob:
-            g = block(g, gcos, gsin, patch_doc, keep, tier)
+        return e, g, cs, doc, patch_doc, cos, sin
+
+    def _local_out(self, e, g, cs, doc, cos, sin, targets):
         g = self.ln_g(g)
         prev = g.gather(1, (cs - 1).clamp(min=0)[..., None].expand(-1, -1, self.global_dim))
         d = e + self.back(prev)
@@ -127,6 +126,52 @@ class BLT(nn.Module):
         logits = self.head(self.ln_d(d))
         loss = None if targets is None else F.cross_entropy(logits.flatten(0, 1), targets.flatten())
         return logits, loss
+
+    def forward(self, inputs, targets=None):
+        idx, nxt, *extra = inputs
+        keep = extra[0] if extra else None
+        tier = extra[1] if len(extra) > 1 else None
+        e, g, cs, doc, patch_doc, cos, sin = self._local_in(idx, nxt)
+        gcos, gsin = rope_cache(torch.arange(g.size(1), device=idx.device), self.global_head_dim)
+        for block in self.glob:
+            g = block(g, gcos, gsin, patch_doc, keep, tier)
+        return self._local_out(e, g, cs, doc, cos, sin, targets)
+
+    @torch.no_grad()
+    def forward_online(self, inputs, policy: Policy, scores=None, window: int = 16, trace=None):
+        idx, nxt = inputs
+        e, g, cs, doc, _, cos, sin = self._local_in(idx, nxt)
+        P = g.size(1)
+        caches = [{} for _ in self.glob]
+        ids = np.empty(0, dtype=np.int64)
+        total, rows, out = np.zeros(P), [], []
+        dynamic = policy.mode in ATTN_MODES
+        for p in range(P):
+            gcos, gsin = rope_cache(torch.tensor([p], device=idx.device), self.global_head_dim)
+            ids = np.append(ids, p)
+            keep = None
+            if policy.mode != "full" and len(ids) > policy.budget:
+                sc = total if policy.mode == "h2o" else np.sum(rows[-window:], 0) if rows else total
+                drop = evict_one(ids, sc if dynamic else scores, policy)
+                keep = torch.tensor(np.delete(np.arange(len(ids) - 1), drop), device=idx.device)
+                ids = np.delete(ids, drop)
+            if trace is not None:
+                trace.append(ids.copy())
+            x = g[:, p:p + 1]
+            if dynamic:
+                for blk in self.glob:
+                    blk.attn.record = []
+            for blk, cache in zip(self.glob, caches):
+                x = blk.step(x, gcos, gsin, cache, keep)
+            if dynamic:
+                row = np.zeros(P)
+                row[ids] = torch.stack([blk.attn.record[0] for blk in self.glob]).mean(0).double().cpu().numpy()
+                for blk in self.glob:
+                    blk.attn.record = None
+                total += row
+                rows.append(row)
+            out.append(x)
+        return self._local_out(e, torch.cat(out, 1), cs, doc, cos, sin, None)
 
     def num_params(self) -> int:
         return sum(p.numel() for p in self.parameters())

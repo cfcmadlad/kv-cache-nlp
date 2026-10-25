@@ -1,0 +1,35 @@
+{
+  "dataset": "wikitext103",
+  "seed": 0,
+  "steps": 3000,
+  "batch_size": 8,
+  "block": 16384,
+  "lr": 0.001,
+  "warmup": 200,
+  "min_lr_frac": 0.1,
+  "weight_decay": 0.01,
+  "grad_clip": 1.0,
+  "bf16": true,
+  "ckpt_every": 250,
+  "log_every": 50,
+  "patching": {
+    "mode": "entropy",
+    "entropy_run": "entropy_wikitext103_mix",
+    "max_len": 16,
+    "stride": 4
+  },
+  "model": {
+    "local_dim": 256,
+    "local_heads": 4,
+    "local_window": 256,
+    "enc_layers": 1,
+    "dec_layers": 2,
+    "global_dim": 384,
+    "global_heads": 6,
+    "global_layers": 6
+  },
+  "mix": {
+    "dataset": "code",
+    "frac": 0.15
+  }
+}

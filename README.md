@@ -5,7 +5,7 @@ CS F429 Natural Language Processing, BITS Pilani Hyderabad, Group 12.
 
 Byte-level models read raw UTF-8, so a sentence spans about four times as many positions as in BPE tokens, and the KV cache grows with it. The Byte Latent Transformer (BLT) already computes next-byte entropy to place patch boundaries. This project tests whether that same entropy can decide which cache entries to evict or quantize, compared with recency (StreamingLLM), attention-score methods (H2O, SnapKV) and random eviction at an equal number of cache bytes.
 
-Part 2 (done) built the data pipeline and two baselines scored in bits per byte (BPB). Part 3 adds the byte-level model, the cache policies and their evaluation. Headline, on small models with three seeds each: using next-byte entropy as the keep signal is negative. Keeping high-entropy patches, or giving them more bits, does worse than random and recency at the same cache bytes in 68 to 70 of 72 comparisons and better in none, and uniform 4-bit KV is within 0.0014 BPB of fp16 at 27 percent of the bytes. An attention-based rule (SnapKV-style, scored offline) beats recency by 0.0001 to 0.0069 BPB. See `docs/results_summary.md`.
+Part 2 (done) built the data pipeline and two baselines scored in bits per byte (BPB). Part 3 adds the byte-level model, the cache policies and their evaluation. Headline, on small models with three seeds each: using next-byte entropy as the keep signal is negative. Keeping high-entropy patches, or giving them more bits, does worse than random and recency at the same cache bytes in 68 to 70 of 72 comparisons and better in none, the penalty grows about tenfold when the models are trained ten times longer, and uniform 4-bit KV is within 0.0014 BPB of fp16 at 27 percent of the bytes. An attention-based rule (SnapKV-style, scored online) beats recency in all 24 comparisons, and eviction plus 4-bit keeps 7 percent of the WikiText cache for 0.0012 BPB. A fixed-size cache follows documents four times longer than the training context and beats resetting the context. See `docs/results_summary.md`.
 
 ## Baseline results
 
@@ -56,9 +56,9 @@ For WikiText-103 the reported runs used `--max-train-docs 4500 --eval-max-docs 6
 
 ## Data
 
-TinyStories (30,000 train stories, 21,990 validation) and WikiText-103 (articles rebuilt from the raw line export, placeholder tokens such as `@-@` restored), Unicode NFC normalised, exact duplicates removed. Part 3 adds PG-19 for long contexts and The Stack Smol for code.
+TinyStories (30,000 train stories, 21,990 validation) and WikiText-103 (articles rebuilt from the raw line export, placeholder tokens such as `@-@` restored), Unicode NFC normalised, exact duplicates removed. Part 3 adds The Stack Smol for code. Long contexts use the long WikiText-103 documents (PG-19 from the proposal was not used).
 
-## Part 3 (in progress)
+## Part 3
 
 Byte-level BLT-style model with patch-granular KV cache policies. Runs write to `runs/<id>/`; byte data to `data/bytes/`.
 
@@ -74,7 +74,7 @@ python scripts/results.py --phase 2
 python -m pytest
 ```
 
-Demo on a CPU laptop (option 4 of `scripts/demo.py` runs the policies and quantization on any text): `python scripts/fetch_assets.py`, then `run.bat` or `./run.sh`. Option 4 fetches the Part 3 models on first use with `scripts/part3_assets.py fetch`; the release asset `v0.3-part3` is built by `scripts/part3_assets.py build` and still has to be uploaded.
+Demo on a CPU laptop (option 4 of `scripts/demo.py` runs the policies and quantization on any text): `python scripts/fetch_assets.py`, then `run.bat` or `./run.sh`. Option 4 fetches the Part 3 models (124 MB, SHA-256 checked) from the `v0.3-part3` release on first use with `scripts/part3_assets.py fetch`; `scripts/part3_assets.py build` rebuilds the zip.
 
 Seeds, control and ablations (run on the cluster with `sbatch slurm/job.sbatch bash scripts/<name>.sh`; each resumes finished runs):
 
@@ -98,6 +98,20 @@ python scripts/compare.py long --out results/part3/long_context.md
 python scripts/compare.py test --out results/part3/test_split.md
 ```
 
-Seeds, ablations, the comparison table, attention baselines, the longer context and the report text are done (tables in `results/part3/`, report draft `docs/report_part3.md`). Not done: the resume half of the Block 2.0 requeue test on the cluster. Details in `PLAN.md`.
+Deployment-oriented runs (`run_deploy.sh`: measured decoding, eviction plus quantization, recency-protected entropy, planted-name recall; `run_online.sh`: online H2O and SnapKV; `run_ablations_seeds.sh`; `run_scale.sh` and `run_scale2.sh`: 30,000-step models and 16k tuning; `run_stream.sh`: bounded-memory streaming):
 
-Plan in `PLAN.md`, related work in `NOVELTY.md`, problems in `CHALLENGES.md`, per-block notes and results in `docs/`.
+```bash
+python scripts/compare_deploy.py online --out results/part3/online_policies.md
+python scripts/compare_deploy.py combo --out results/part3/deploy_combo.md
+python scripts/compare_deploy.py stream --out results/part3/stream_16k.md
+python scripts/compare_deploy.py bench --out results/part3/deploy_bench.md
+python scripts/compare_deploy.py hybrid --out results/part3/deploy_hybrid.md
+python scripts/compare_deploy.py needle --out results/part3/deploy_needle.md
+python scripts/compare_deploy.py ablseeds --out results/part3/ablations_seeds.md
+python scripts/compare_deploy.py scale --out results/part3/scale_and_tuning.md
+python scripts/compare_deploy.py memory --out results/part3/deploy_memory.md
+```
+
+All experiments are done; tables are in `results/part3/` and the report draft is `docs/report_part3.md`. Details in `PLAN.md`.
+
+Plan in `PLAN.md`, related work in `NOVELTY.md`, per-block notes and results in `docs/`.

@@ -34,12 +34,12 @@ def run(model, cfg, args, device):
     entropy_run = args.entropy_run or cfg["patching"]["entropy_run"]
     entropy = np.load(base / f"entropy_{entropy_run}" / f"{args.split}.npy", mmap_mode="r")
     count = len(offsets) - 1 if args.max_docs is None else min(args.max_docs, len(offsets) - 1)
-    docs = [i for i in range(count) if offsets[i + 1] > offsets[i]]
+    docs = [i for i in range(count) if offsets[i + 1] - offsets[i] > max(0, args.min_len)]
     variants = [("full", 0)] + [(m, b) for m in args.policies for b in args.budgets]
     nats = {v: np.zeros(len(docs)) for v in variants}
     entries = {v: [] for v in variants}
     sizes = np.zeros(len(docs), dtype=np.int64)
-    block = cfg["block"]
+    block = args.block or cfg["block"]
     for di, i in enumerate(docs):
         s, e = offsets[i], offsets[i + 1]
         doc, h = np.asarray(data[s:e]), entropy[s:e].astype(np.float32)
@@ -71,6 +71,11 @@ def run(model, cfg, args, device):
                 total = 0.0
                 for r in range(reps):
                     rng = np.random.default_rng([args.seed, r, di, a])
+                    if args.online and (args.online != "attn" or mode in ATTN_MODES):
+                        scores = None if mode in ATTN_MODES else patch_scores(pol, P, ent, rng)
+                        logits = model.forward_online(inputs, pol, scores, args.snap_window)[0][0]
+                        total += F.cross_entropy(logits.float(), target, reduction="sum").item()
+                        continue
                     if mode in ATTN_MODES:
                         keep = None
                         for _ in range(args.attn_iters):
@@ -82,12 +87,12 @@ def run(model, cfg, args, device):
                     logits = model((*inputs, torch.from_numpy(mask)[None].to(device)))[0][0]
                     total += F.cross_entropy(logits.float(), target, reduction="sum").item()
                 nats[v][di] += total / reps
-                entries[v].append(mean_cache_entries(mask))
+                entries[v].append(float(np.minimum(np.arange(1, P + 1), budget).mean()) if args.online == "all" or (args.online and mode in ATTN_MODES) else mean_cache_entries(mask))
     per_patch = GLOBAL_CACHE_BYTES_PER_PATCH(cfg["model"])
     return {"run": args.run, "dataset": dataset, "split": args.split, "docs": len(docs),
             "bytes_per_doc": sizes.tolist(), "bytes_per_patch": per_patch,
             "settings": {"sink": args.sink, "recent": args.recent, "agg": args.agg, "seed": args.seed,
-                         "random_seeds": args.random_seeds, "attn_iters": args.attn_iters, "snap_window": args.snap_window, "entropy_run": entropy_run, "signal": args.signal},
+                         "random_seeds": args.random_seeds, "attn_iters": args.attn_iters, "snap_window": args.snap_window, "online": args.online, "block": block, "min_len": args.min_len, "entropy_run": entropy_run, "signal": args.signal},
             "variants": {f"{m}|{b}": {"nats": nats[(m, b)].tolist(), "mean_entries": float(np.mean(entries[(m, b)])),
                                       "mean_cache_bytes": float(np.mean(entries[(m, b)])) * per_patch}
                          for m, b in variants}}
@@ -107,6 +112,9 @@ def main():
     p.add_argument("--signal", default="entropy_model", choices=["entropy_model", "own"])
     p.add_argument("--attn-iters", type=int, default=2)
     p.add_argument("--snap-window", type=int, default=16)
+    p.add_argument("--online", nargs="?", const="all", default=None, choices=["attn", "all"])
+    p.add_argument("--block", type=int, default=None)
+    p.add_argument("--min-len", type=int, default=0)
     p.add_argument("--seed", type=int, default=0)
     p.add_argument("--random-seeds", type=int, default=3)
     p.add_argument("--entropy-run", default=None)

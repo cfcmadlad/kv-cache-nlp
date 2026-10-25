@@ -216,8 +216,10 @@ def attention_table(resamples: int, seed: int) -> str:
     return "\n".join(lines)
 
 
-LONG = [("blt_wikitext103mix_entropy", "4,096 bytes", [64, 128]), ("blt_wikitext103mix_L16k_entropy", "16,384 bytes", [64, 128, 256, 512]),
-        ("blt_wikitext103mix_fixed", "4,096 bytes", [64, 128]), ("blt_wikitext103mix_L16k_fixed", "16,384 bytes", [64, 128, 256, 512])]
+LONG = [("blt_wikitext103mix_entropy", "4,096 bytes", [64, 128]), ("blt_wikitext103mix_L16k_entropy", "16,384 bytes, batch 2", [64, 128, 256, 512]),
+        ("blt_wikitext103mix_L16k_entropy_b8", "16,384 bytes, batch 8", [64, 128, 256, 512]),
+        ("blt_wikitext103mix_fixed", "4,096 bytes", [64, 128]), ("blt_wikitext103mix_L16k_fixed", "16,384 bytes, batch 2", [64, 128, 256, 512]),
+        ("blt_wikitext103mix_L16k_fixed_b8", "16,384 bytes, batch 8", [64, 128, 256, 512])]
 
 
 def long_table(resamples: int, seed: int) -> str:

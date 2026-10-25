@@ -41,4 +41,4 @@ Set `RUN_ID=name` before `sbatch` to choose the run directory; the default is th
 
 Why checkpoint so often? The cluster allows one job at a time with a 2-day limit, so a lost job costs days.
 Why is the resume test a comparison with an uninterrupted run? Loading a checkpoint without error proves nothing; matching weights proves the optimizer and data order were restored.
-What is not verified yet? One job going through signal, requeue and resume under a single job id. On the cluster, job 407961 was signalled, saved a checkpoint and was requeued, and a later job (408216) resumed from that checkpoint (Windows has no SIGUSR1).
+What was verified on the cluster? One job (416139) was signalled with SIGUSR1 at step 1,864, saved a checkpoint, was requeued under the same job id, resumed from step 1,864 and finished at step 24,000. What is not verified there is equality of the resumed run with an uninterrupted one, which only the local test covers (Windows has no SIGUSR1).

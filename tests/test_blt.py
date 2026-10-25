@@ -1,5 +1,8 @@
+import numpy as np
 import pytest
 import torch
+
+from kvc.cache import Policy, visible_mask
 
 from models.blt import BLT, expected_params
 from models.entropy import BOS
@@ -89,3 +92,41 @@ def test_document_boundaries_isolate_patches():
 def test_parameter_count_matches_hand_calculation():
     assert BLT(**SMALL).num_params() == expected_params(32, 1, 2, 48, 2)
     assert BLT().num_params() == expected_params() == 13_333_632
+
+
+def online_logits(m, idx, nxt, policy, scores=None, window=4):
+    return m.forward_online((idx, nxt), policy, scores, window)[0]
+
+
+def test_online_forward_matches_masked_forward_and_step_decoding():
+    m = model()
+    idx, nxt = sample(n=120, seed=5)
+    P = int(nxt.sum()) + 1
+    rng = np.random.default_rng(0)
+    for mode, scores in (("recency", np.arange(P, dtype=float)), ("random", rng.random(P))):
+        pol = Policy(mode, 6, 1, 2)
+        mask = torch.from_numpy(visible_mask(P, scores, pol))[None]
+        with torch.no_grad():
+            masked = m((idx, nxt, mask))[0]
+        online = online_logits(m, idx, nxt, pol, scores)
+        assert torch.allclose(masked, online, atol=1e-4)
+    state, rows = m.init_state(), []
+    for i in range(idx.size(1)):
+        rows.append(m.step(state, idx[:, i], bool(nxt[0, i]), policy=Policy("recency", 6, 1, 2)))
+    assert torch.allclose(torch.stack(rows, 1), online_logits(m, idx, nxt, Policy("recency", 6, 1, 2), np.arange(P, dtype=float)), atol=1e-4)
+
+
+def test_online_attention_policies_are_causal_and_full_at_large_budget():
+    m = model()
+    idx, nxt = sample(n=120, seed=6)
+    with torch.no_grad():
+        full = m((idx, nxt))[0]
+    for mode in ("h2o", "snap"):
+        assert torch.allclose(online_logits(m, idx, nxt, Policy(mode, 1000, 1, 2)), full, atol=1e-4)
+        pol = Policy(mode, 5, 1, 2)
+        a = online_logits(m, idx, nxt, pol)
+        other = idx.clone()
+        other[0, 80:] = torch.randint(0, 256, (idx.size(1) - 80,))
+        b = online_logits(m, other, nxt, pol)
+        assert torch.allclose(a[:, :80], b[:, :80], atol=1e-4)
+        assert not torch.allclose(a, full, atol=1e-4)

@@ -1,6 +1,6 @@
-# Results summary (validation only, 21 Oct 2026)
+# Results summary (validation only, 25 Oct 2026)
 
-All numbers are bits per byte (BPB) on matched validation documents: TinyStories first 500 documents (405,231 bytes) and WikiText-103 all 60 documents (1,129,194 bytes). The test splits have not been touched. Intervals are 95 percent bootstrap intervals over documents. Regenerate any table with the command in its section; the raw tables are in `results/part3/` and `results/phase2.md`.
+All numbers are bits per byte (BPB) on matched validation documents: TinyStories first 500 documents (405,231 bytes) and WikiText-103 all 60 documents (1,129,194 bytes). The WikiText test split was evaluated once (section below); TinyStories has none. Intervals are 95 percent bootstrap intervals over documents. Regenerate any table with the command in its section; the raw tables are in `results/part3/` and `results/phase2.md`.
 
 Training hardware: seed 0 of the entropy-patched and fixed-stride-4 models was trained on a laptop RTX 4060; seeds 1 and 2, the stride-5 control and the byte-level model were trained on the cluster (RTX PRO 6000). Same code and configs, different GPU, so seed 0 differs from the others in more than the seed.
 
@@ -103,7 +103,7 @@ Every patching scheme now has three seeds on all four settings (TinyStories and 
 
 ## Attention-score baselines (`python scripts/compare.py attention`, `results/part3/attention_policies.md`)
 
-Two policies that use the model's own attention, implemented as scoring rules over the patch cache: h2o keeps the patches with the largest accumulated attention received so far (Zhang et al., averaged over heads and layers) and snap keeps the patches that the last 16 patches attend to most (SnapKV-style). Both protect the first patch and the 8 newest, like every other policy. They are offline approximations: scores come from a full-cache pass refined once under the resulting mask (`--attn-iters 2`), not from attention computed online under the evicted cache, so they are likely a little better than an online version would be. The mask machinery is the same one tested against step-by-step decoding for the other policies; the attention scoring itself is only tested against hand-computed matrices.
+Two policies that use the model's own attention, implemented as scoring rules over the patch cache: h2o keeps the patches with the largest accumulated attention received so far (Zhang et al., averaged over heads and layers) and snap keeps the patches that the last 16 patches attend to most (SnapKV-style). Both protect the first patch and the 8 newest, like every other policy. In this section they are offline approximations: scores come from a full-cache pass refined once under the resulting mask (`--attn-iters 2`), not from attention computed online under the evicted cache. The online section below repeats them with attention accumulated during patch-by-patch decoding and finds the same ranking (snap online is never worse than snap offline).
 
 Paired differences against recency (negative means the attention policy is better), over all models and both budgets of each set:
 - Over the 72 comparisons (9 models in each of 4 settings, 2 budgets), snap is better than recency with the interval below zero in 67, indistinguishable in 5 (all at the larger budget, four of them on WikiText) and worse in none, by 0.0001 to 0.0069 BPB (for example TinyStories entropy seed 1 at 32 patches: -0.0048 [-0.0054, -0.0043]; WikiText seed 1 at 64: -0.0017 [-0.0023, -0.0011]). It is better than random in 68, indistinguishable in 3 and worse in 1, by up to 0.0134.
@@ -111,13 +111,41 @@ Paired differences against recency (negative means the attention policy is bette
 - At byte level (stride-1 model, three seeds) h2o is worse than random at 32 and 64 entries in every seed (seed 0: 1.1902 against 1.1110 at 32). snap beats recency at 32 and 64 entries in every seed (seed 0: 0.9298 against 0.9506 at 32) and loses to it at 288 entries in every seed (seed 0: 0.7617 against 0.7494).
 - Effect sizes are small. For the seed-0 TinyStories entropy model at 32 patches, recency costs 0.0098 BPB over the full cache and snap recovers 0.0041 of it. A policy that uses the model's own recent attention helps a little where a static content score does not.
 
-## Longer context (`python scripts/compare.py long`, `results/part3/long_context.md`)
+## Longer context (`python scripts/compare.py long`, `results/part3/long_context.md`; tuning in `results/part3/scale_and_tuning.md`)
 
-WikiText models with the code mix trained and evaluated on 16,384-byte chunks (`configs/blt_wikitext103mix_L16k_*`, `scripts/run_long.sh`; batch size 2 so the bytes seen are the same), budgets 64 to 512 patches, one seed.
-- The 16k models score worse than the 4k models (1.8920 and 1.8971 against 1.7190 and 1.7541). I did not tune them and trained them with four times fewer sequences per step, so some of the gap may be optimisation rather than context; I have not tested this.
-- Entropy patching at 16k: keeping high entropy costs +0.0016 (64 patches) falling to +0.0003 (512) against random, with the interval including zero from 256 patches up. Differences between policies shrink as the budget grows.
-- Fixed stride at 16k: keeping high entropy is clearly worse than random (+0.0136 at 64, +0.0092 at 512), about six times the 4k effect at 64 patches (+0.0022); the cause is unknown.
-- snap beats recency at 4k but not at 16k (entropy patching: -0.0004 [-0.0010, +0.0001] at 64; fixed stride: +0.0021 worse). h2o is worse than recency everywhere at 16k. No policy beats recency by a margin that matters at 16k.
+WikiText models with the code mix trained and evaluated on 16,384-byte chunks (`configs/blt_wikitext103mix_L16k_*`, `scripts/run_long.sh`, `scripts/run_scale.sh`, `scripts/run_scale2.sh`), budgets 64 to 512 patches, one seed. The first 16k models (batch size 2, same bytes seen as the 4k models) scored worse than the 4k models (1.8920 and 1.8971 against 1.7190 and 1.7541). That was an optimisation problem. Tuning on validation (learning rate 0.001 or 0.0003, batch size 2 or 8):
+
+| Run | Batch | Learning rate | Validation BPB |
+|---|---|---|---|
+| L16k entropy | 2 | 0.001 | 1.8920 |
+| L16k entropy | 2 | 0.0003 | 2.0019 |
+| L16k entropy | 8 | 0.001 | 1.5843 |
+| L16k entropy | 8 | 0.0003 | 1.8213 |
+| L16k fixed stride 4 | 2 | 0.001 | 1.8971 |
+| L16k fixed stride 4 | 8 | 0.001 | 1.6048 |
+
+Batch 8 with learning rate 0.001 gives 1.5843 (entropy patching) and 1.6048 (fixed), better than the 4k models, and I use these as the long-context models. The batch-8 runs see four times more bytes than the 4k models, so part of the gain is more training, not context length; I did not run a 4k model with the same bytes (the 10x-training section below does this for 4k). The earlier long-context conclusions were drawn on the under-trained models and are withdrawn: keeping high entropy does not become harmless at long context.
+- Entropy patching, batch 8: keeping high entropy is worse than random by +0.0192 [+0.0176, +0.0209] at 64 patches, +0.0213 at 128 and 256 and +0.0161 at 512, and worse than recency by 0.041 BPB at 64 patches and 0.025 at 512 (differences of the means, 1.6414 against 1.6001 and 1.6104 against 1.5854).
+- Fixed stride, batch 8: worse than random by +0.0186 (64), +0.0198 (128), +0.0174 (256), +0.0131 (512).
+- snap beats recency at 64 patches (entropy patching -0.0016 [-0.0026, -0.0006], fixed -0.0020 [-0.0029, -0.0012]) and ties it from 128 patches up. h2o is worse than recency at every budget (+0.013 to +0.033).
+- Even with 512 patches (about 2,300 bytes of text, a seventh of a 16,384-byte chunk) the high-entropy rule still loses 0.016 BPB to random.
+
+## Ten times more training (`python scripts/compare_deploy.py scale`, `results/part3/scale_and_tuning.md`)
+
+The main models are small and short-trained (3,000 steps, about 98M bytes), so I trained WikiText code-mix models for 30,000 steps (about 983M bytes, 1.9 epochs of the 526 MB training file; `*_x10` configs, `scripts/run_scale.sh`, `scripts/run_scale2.sh`) with three seeds of entropy patching and one of fixed stride 4, and evaluated them on the same 60 validation documents.
+
+| Model | Full-cache BPB | entropy - random at 64 / 128 patches | entropy - recency at 64 | snap - recency at 64 / 128 |
+|---|---|---|---|---|
+| Entropy patching, 3,000 steps, seed 0 | 1.7190 | +0.0020 / +0.0017 | +0.0053 | -0.0012 / -0.0003 |
+| Entropy patching, 30,000 steps, seed 0 | 1.2949 | +0.0287 / +0.0260 | +0.0562 | -0.0051 / -0.0020 |
+| Entropy patching, 30,000 steps, seed 1 | 1.2983 | +0.0284 / +0.0258 | +0.0544 | -0.0057 / -0.0021 |
+| Entropy patching, 30,000 steps, seed 2 | 1.3118 | +0.0238 / +0.0215 | +0.0478 | -0.0049 / -0.0019 |
+| Fixed stride 4, 30,000 steps, seed 0 | 1.3571 | +0.0098 / +0.0078 | +0.0277 | -0.0042 / -0.0014 |
+
+- The better-trained models score 1.29 to 1.31 BPB, better than the Part 2 BPE transformer (1.5200 on its WikiText validation set; the code mix is in training only). The seed spread is 0.017 (3,000 steps: 0.102).
+- The entropy penalty grows more than tenfold with training (+0.002 to +0.029 against random at 64 patches) and every interval excludes zero in all three seeds, so a small, short-trained model is not what made the entropy rule look bad. The cost of any eviction also grows: recency at 64 patches costs 0.018 BPB over the full cache (3,000 steps: 0.002).
+- snap beats recency in all three seeds and both budgets, by several times as much as before. Entropy patching is below fixed stride by 0.062 BPB (one fixed-stride seed; at 3,000 steps the gap is 0.035 for seed 0 and 0.025 for the three-seed means).
+- The same experiment on TinyStories is not usable. The training set is 26.7 MB, so 30,000 steps are 37 epochs; the entropy-patched model reached a training loss of 0.14 nats and a validation BPB of 1.6493 (0.7980 at 3,000 steps), and the fixed-stride model 1.8765. Those rows are in `scale_and_tuning.md` for completeness; I draw no conclusions from them.
 
 ## Quantization and attention across seeds
 
@@ -137,9 +165,58 @@ WikiText-103 test, 62 documents, evaluated once (`scripts/run_test.sh`) for the 
 - snap beats recency in 33 of 36 cells (the other three are indistinguishable), by 0.0001 to 0.0039 BPB. h2o is worse than recency in all cells.
 - Full-cache test BPB is 0.02 to 0.03 higher than validation for the prose-only entropy models (1.6986, 1.7273, 1.7372 against 1.6801, 1.6994, 1.7080). Entropy patching is below both fixed strides in all three seed pairs for the prose-only models, and in 5 of 6 pairs with the code mix (the exception is seed 2 against stride 4, 1.8435 against 1.8318), the same pattern as on validation.
 
+## Online attention policies (`python scripts/compare_deploy.py online`, `results/part3/online_policies.md`)
+
+The offline h2o and snap scores were replaced by online ones: `BLT.forward_online` decodes the global stack patch by patch with a real cache, chooses the entry to drop before the new patch is attended to, and accumulates attention rows as they are produced (h2o: all rows so far; snap: the last 16). Tests check that the online path equals step-by-step decoding for recency and random, that it is causal for h2o and snap, and that it equals the full cache at a large budget. On the 12 entropy-patched models (300 TinyStories documents, 60 WikiText documents, two budgets each, 24 comparisons):
+- snap online is better than recency in all 24 comparisons (by 0.0002 to 0.0077 BPB; WikiText with code, seed 0, 64 patches: -0.0013 [-0.0018, -0.0009]).
+- h2o online is worse than recency in 22 of 24, tied in 1 and better in 1 (from -0.0018 to +0.0134), so the offline conclusion holds.
+- snap online is never worse than snap offline and is at most 0.0009 BPB better (7 of 24 comparisons favour the online version, 17 tie), so the offline tables were a good approximation.
+- recency through the online path equals the masked recency run to four decimals in all 24 comparisons (two have intervals that exclude zero at a difference below 0.0001), a check that the online loop reproduces the masks.
+
+## Eviction with 4-bit quantization (`python scripts/compare_deploy.py combo`, `results/part3/deploy_combo.md`)
+
+Eviction and uniform 4-bit K and V together, mean of three seeds per dataset (cache bytes computed, snap scored offline here):
+
+| Setting | TinyStories cost over full cache (share of bytes) | WikiText cost over full (share of bytes) |
+|---|---|---|
+| recency, 64 patches, 4-bit | +0.0072 (15%) | +0.0046 (3.9%) |
+| snap, 64 patches, 4-bit | +0.0049 (15%) | +0.0026 (3.9%) |
+| recency, 128 patches, 4-bit | n/a | +0.0019 (7.4%) |
+| snap, 128 patches, 4-bit | n/a | +0.0012 (7.4%) |
+| keep high entropy, 64 patches, 4-bit | +0.0224 (15%) | +0.0196 (3.9%) |
+
+Full-cache BPB is 0.8183 (TinyStories) and 1.6958 (WikiText). A WikiText cache of 128 patches at 4-bit uses 7.4 percent of the full cache and costs 0.0012 to 0.0019 BPB. Quantization and eviction costs add up roughly linearly; keeping high-entropy patches is the worst policy at every budget, with or without quantization.
+
+## Bounded-memory streaming (`python scripts/compare_deploy.py stream`, `results/part3/stream_16k.md`)
+
+The question for deployment is whether a cache of fixed size can follow a document longer than the context the model was trained on. Three WikiText code-mix models trained on 4,096-byte chunks decoded 46 validation documents longer than 8,192 bytes in 16,384-byte chunks with a fixed patch budget, so patch positions reach about 3,600 (the models saw about 900). The baseline resets the context every 4,096 bytes with a full cache.
+- Recency with 64 patches beats the chunked full-cache baseline in all three seeds (by 0.0030, 0.0032 and 0.0008 BPB), and with 256 patches by 0.0051, 0.0058 and 0.0035. The reset loses the context at every chunk boundary; a small continuous window does not, and the model's extrapolated patch positions did not hurt.
+- snap online is better still: at 64 patches it is 0.0014, 0.0008 and 0.0024 below recency with intervals excluding zero, and 0.0044, 0.0040 and 0.0032 below the chunked baseline. At 256 patches snap and recency tie.
+- Random (about +0.003 to +0.005 against recency), h2o (+0.004 to +0.009) and keeping high entropy (+0.006 to +0.009) are all worse than recency at every budget, in all three seeds, with intervals above zero.
+
+## Measured decoding (`python scripts/compare_deploy.py bench`, `results/part3/deploy_bench.md`)
+
+Step-by-step decoding of one stream on the cluster GPU (batch 1, Python loop, recency eviction with real removal from the cache tensors; seed-0 WikiText code-mix model). The global cache after 65,536 bytes is 136.5 MB with a full cache against 0.59, 1.18 and 2.36 MB with 64, 128 and 256 patches, matching the computed sizes. Time per byte stays at 0.9 ms with a bounded cache and rises from 0.9 ms (2,048 bytes) to 2.0 ms (65,536) with a full cache; total time for 65,536 bytes was 102 s against 60 s. The byte window caches are a fixed 786 KB, so with a bounded cache they are larger than the global cache at 64 patches, and the separate entropy model adds about 2.1 MB of window cache and 3.3M parameters. Memory is the main saving and speed matters only at long contexts. `results/part3/deploy_memory.md` gives computed sizes per context: the patch cache at full precision is about 0.9 times a BPE transformer cache of the same width, and a byte-level transformer needs about 4 times more.
+
+## Recency-protected entropy (`python scripts/compare_deploy.py hybrid`, `results/part3/deploy_hybrid.md`)
+
+The budget is split: the newest half is protected, and the other half goes to high-entropy patches (hybrid entropy) or random patches (hybrid random).
+- Hybrid entropy is worse than plain recency in 23 of 24 model and budget cells and tied in 1 (for example TinyStories seed 0, 32 patches: +0.0047 [+0.0040, +0.0054]), and worse than hybrid random in all 24.
+- Hybrid random beats plain recency in 11 of 12 TinyStories cells (with and without code; seed 0: -0.0012 and -0.0013) and is worse in 5 of 12 and tied in 7 of 12 WikiText cells (with and without code). On TinyStories a few old patches chosen at random help more than a slightly longer recency window; entropy is not a better way to choose them.
+
+## Ablations on seeds 1 and 2 (`python scripts/compare_deploy.py ablseeds`, `results/part3/ablations_seeds.md`)
+
+- The main rule (mean over the patch), the model's own entropy, first-byte entropy and sink size 0 or 4 are worse than random in all three seeds on both datasets.
+- Maximum over the patch: worse than random in 3 of 3 seeds on WikiText, 2 of 3 on TinyStories (seed 1: -0.0012, better than random).
+- Sum over the patch: never worse than random on TinyStories (0 of 3 seeds; seed 1: -0.0024), worse in 3 of 3 on WikiText. Sum and maximum are the only rules that are ever better than random, in one seed each, and both only on TinyStories.
+
+## Planted-name recall (`python scripts/compare_deploy.py needle`, `results/part3/deploy_needle.md`)
+
+A random four-syllable name is introduced early and repeated after 400, 1,200 or 3,000 filler bytes; the score is the BPB of the name after its first two letters, 40 trials per distance. The models do not use the earlier mention: with a full cache the score equals the no-cue control (for example TinyStories seed 0 at 400 bytes: 9.24 bits per byte against 9.27 for the control), so no policy can be shown to help and nothing about retrieval can be concluded at this scale. The entropy rule does keep the planted name's patches more often than random does (45 percent against 31 percent at 64 patches and a distance of 400 bytes, 18 against 11 percent at 1,200), but the model gains nothing from them.
+
 ## Requeue test (Block 2.0)
 
-Two smoke jobs with a 7-minute limit on the cluster. Job 407961 received SIGUSR1, saved a checkpoint, wrote the PREEMPTED marker and was requeued by SLURM (restart count 1). I cancelled its held second attempt because the one-GPU-job limit kept it behind the main chain and it would have looped on every requeue. Job 408216, submitted later into the same run directory, started and printed "resumed at step 1", so the cluster resume path loads the checkpoint that the signal handler wrote. What I did not see is one job going through preempt, requeue and resume under a single job id, and the first attempt recorded ending at step 1 (I have not checked why). The local test (resume equals uninterrupted) covers equality of the resumed run.
+Verified on the cluster under a single job id. Job 416139 (`configs/requeue_cluster4.json`, 24,000 steps) was sent SIGUSR1 with `scancel --signal=USR1 --batch` while running. It saved a checkpoint at step 1,864, wrote the PREEMPTED marker and was requeued by the batch script (restart count 1). SLURM held it for its restart delay (about 10 minutes), then restarted the same job id; the log printed "resumed at step 1864" and training ran to step 24,000 (final loss 0.1845), with `meta.json` recording both attempts (`ended_step` 1864, then `resumed_from_step` 1864 and `ended_step` 24000, status done). Earlier smoke jobs (407961 and 408216, 7-minute limit) showed the same path across two job ids. Two attempts to repeat the single-id test were not signalled because my signalling script failed (jobs 415084 and 416117 ran straight through), and one earlier attempt reused the old run name `requeue_test`, which overwrote that smoke run's `config.json` (its log and checkpoint were kept; the smoke config is `configs/smoke.json`). The first smoke attempt recorded ending at step 1; I did not find out why. The local test (resume equals uninterrupted) covers equality of the resumed run.
 
 ## Why entropy does not work as a keep signal here
 
@@ -149,8 +226,8 @@ Attention received by patches at least 8 patches old correlates negatively with 
 
 - Three seeds for every patching scheme and setting; quantization and attention analysis use three seeds only where stated, the ablations and the code-domain tables use seed 0, the byte-level model has three seeds, the 16k models one.
 - Seed 0 of the prose-only models was trained on a laptop GPU, the rest on the cluster. Seed 2 is the worst or second-worst seed for most schemes.
-- Small models (13M parameters, 3,000 steps) and 4,096-byte contexts (16,384 for the long-context models, which score worse and were not tuned); budgets and gains are specific to those contexts.
-- Eviction and quantization are simulated by masks and rounding, checked equal to step-by-step decoding in tests; cache bytes are computed, not measured. The attention policies (h2o, snap) are offline approximations scored from a full-cache pass refined once; an online version has no test against step decoding.
+- Small models (13M parameters). Most results use 3,000 training steps and 4,096-byte contexts; the 10x-training WikiText models (30,000 steps; three seeds of entropy patching, one of fixed stride) and the tuned 16,384-byte models (one seed each) give the same sign with larger effects. The TinyStories 10x models overfit and are not used. Budgets and gains are specific to these sizes.
+- Eviction and quantization are simulated by masks and rounding, checked equal to step-by-step decoding in tests; cache bytes are computed, not measured. The offline attention policies (h2o, snap in the older tables) are scored from a full-cache pass refined once. The online versions run in `forward_online`, tested equal to step-by-step decoding for recency and random and tested for causality and equality to the full cache at a large budget for h2o and snap; the step-by-step `BLT.step` path does not implement attention policies, so there is no step-decoding test for them.
 - The own-entropy ablation scores patches from a full-cache pass.
 - Code results use 200 validation files; the TinyStories and WikiText code-mix models share one 15 percent code share and thresholds tuned on their own validation sets. No test split has been evaluated: TinyStories has no test split in the byte data.
-- The requeue path is verified in two jobs (preempt and requeue; resume from the saved checkpoint), not under a single job id.
+- The requeue path is verified end to end under one job id (signal, checkpoint, requeue, resume, finish).
