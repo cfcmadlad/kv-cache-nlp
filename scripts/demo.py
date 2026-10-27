@@ -66,6 +66,22 @@ def ask(prompt: str, choices: list) -> str:
     return answer
 
 
+MIN_BUDGET = 10
+
+
+def ask_int(prompt: str, default: int, minimum: int = 1) -> int:
+    while True:
+        answer = read_line(f"{prompt} (default {default}): ")
+        try:
+            value = int(answer) if answer else default
+        except ValueError:
+            print("  Please enter a whole number.")
+            continue
+        if value >= minimum:
+            return value
+        print(f"  Please enter at least {minimum}.")
+
+
 def train_live():
     dataset = ask("Dataset", ["tinystories", "wikitext103"])
     model = ask("Model", ["ngram", "transformer"])
@@ -119,7 +135,7 @@ def compress_cache():
     samples = read_jsonl_texts(REPO_ROOT / "data" / "processed" / dataset / "val.jsonl", 20)
     print(f"\nType or paste one line of text (up to {MAX_BYTES} bytes), or press Enter to use a validation document.\n")
     text = read_line("> ") or max(samples[:5], key=len)
-    budget = int(read_line("Global cache budget in patches (default 32): ") or 32)
+    budget = ask_int("Global cache budget in patches, at least 10", 32, MIN_BUDGET)
     result = analyse(text, model, entropy, cfg, budget, device)
     safe_print(f"\n{result['bytes']} bytes in {result['patches']} patches ({result['mean_patch_len']:.1f} bytes per patch). "
                f"Patch boundaries:\n{result['marked'][:600]}\n")
@@ -131,8 +147,8 @@ def compress_cache():
 def train_part3():
     from demo_part3 import evaluate_live, train_live
     dataset = ask("Dataset", ["tinystories", "wikitext103"])
-    steps = int(read_line("Training steps (default 300): ") or 300)
-    budget = int(read_line("Cache budget in patches for the comparison (default 16): ") or 16)
+    steps = ask_int("Training steps", 300)
+    budget = ask_int("Cache budget in patches for the comparison, at least 10", 16, MIN_BUDGET)
     device = "cuda" if torch.cuda.is_available() else "cpu"
     count = 1500 if dataset == "tinystories" else 60
     texts = read_jsonl_texts(REPO_ROOT / "data" / "processed" / dataset / "train.jsonl", count)
@@ -157,8 +173,8 @@ def stream_cache():
     samples = read_jsonl_texts(REPO_ROOT / "data" / "processed" / dataset / "val.jsonl", 40)
     print("\nType or paste text, or press Enter to use validation text.\n")
     text = read_line("> ") or " ".join(samples)
-    max_bytes = int(read_line("Bytes to decode one at a time (default 4000): ") or 4000)
-    budget = int(read_line("Global cache budget in patches (default 64): ") or 64)
+    max_bytes = ask_int("Bytes to decode one at a time", 4000, 100)
+    budget = ask_int("Global cache budget in patches, at least 10", 64, MIN_BUDGET)
     result = stream_compare(text, model, entropy, cfg, budget, device, max_bytes)
     print(f"\n{result['bytes']} bytes in {result['patches']} patches, decoded one byte at a time with real cache eviction.\n")
     print(f"{'Cache setting':<36}{'BPB':>8}{'Final KV cache':>16}{'Seconds':>10}")
@@ -182,7 +198,12 @@ def main():
         choice = read_line("> ")
         if choice == "8":
             return
-        actions.get(choice, lambda: print("  Please enter a number from 1 to 8."))()
+        try:
+            actions.get(choice, lambda: print("  Please enter a number from 1 to 8."))()
+        except (EOFError, KeyboardInterrupt):
+            raise
+        except Exception as e:
+            print(f"  That option failed ({type(e).__name__}: {e}). Back to the menu.")
 
 
 if __name__ == "__main__":

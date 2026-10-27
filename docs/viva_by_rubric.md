@@ -4,6 +4,22 @@ Likely examiner questions for each Part 3 rubric item (Novelty 3, Improvement 3,
 
 ## Viva notes
 
+### Opening statement (60 seconds)
+
+Byte-level language models need about four times more KV cache than BPE models. We built a 13.3M-parameter BLT-style model with one cache entry per patch and tested how to compress that cache under a controlled protocol: three seeds, paired bootstrap intervals, random and recency controls, a test split, and tests for every policy. What works: eviction plus 4-bit quantization keeps 7.4 percent of the cache for +0.0012 BPB; an online SnapKV-style policy beats recency in 24 of 24 comparisons; a fixed-size cache follows documents four times longer than training better than resetting the context, with constant measured memory and time per byte; the BLT needs 2.8 times fewer FLOPs per byte than a byte-level Transformer. What did not work: keeping the patches with high next-byte entropy, the signal the BLT already computes; it is worse than random in 68 of 72 comparisons, and our error analysis shows it keeps one- and two-byte fragments. What we cannot say: whether this holds for much larger models or for retrieval tasks, because our models do not retrieve.
+
+### Best result and best evidence
+
+Best practical result: `results/part3/deploy_combo.md` (7.4 percent of cache bytes, +0.0012 BPB). Best evidence for the negative result: 72 paired comparisons (`results/part3/seeds.md`), the test split (`results/part3/test_split.md`), ten times more training (`results/part3/scale_and_tuning.md`) and the error analysis (`docs/error_analysis_part3.md`). Best sign of care: problems we found ourselves and corrected (`CHALLENGES.md`, entries 12, 13 and 16).
+
+### Why this problem, and how it compares with the LLMs people use
+
+Why did you choose this? The KV cache is the deployment bottleneck, tokenizer-free models are attractive but make it four times larger, and the BLT already computes an entropy that nobody reused for the cache (`docs/proposal_vs_delivered.md`, report section 1).
+
+How does it compare with ChatGPT-class models? Public models such as Llama 2 and Llama 3 read BPE subword tokens (32k and 128k vocabularies) and cut cache cost in the architecture, for example grouped-query attention with 8 KV heads in Llama 3 (verified in arXiv:2407.21783, Table 3). We study the same bottleneck on bytes at 13.3M parameters, about 600 times smaller than an 8B model, so we do not compare quality. What transfers is the protocol, the policies, and the finding that attention-guided eviction works and the free entropy signal does not (`report/figures/fig_public.pdf`, `configs/public_models.json`).
+
+Did you do what you proposed? Yes, with stated changes (`docs/proposal_vs_delivered.md`).
+
 ### Novelty (3)
 
 What is new here? A test of entropy-ranked cache retention on a byte-level model with patch-granular caches, against random and recency at equal cache bytes, with three seeds per setting, paired bootstrap intervals and a test split (`results/part3/seeds.md`, `results/part3/test_split.md`). Also an online, tested implementation of H2O and SnapKV-style policies over patch caches (`BLT.forward_online`, `tests/test_blt.py`), and measured streaming results with a bounded cache (`results/part3/stream_16k.md`, `results/part3/pg19_stream.md`). The result of the main test is negative.

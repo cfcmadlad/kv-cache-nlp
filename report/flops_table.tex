@@ -1,0 +1,16 @@
+\begin{tabular}{@{}lrrrr@{}}
+\toprule
+ & \multicolumn{2}{c}{1,024 bytes} & \multicolumn{2}{c}{4,096 bytes}\\
+Model & MFLOPs & MB & MFLOPs & MB\\
+\midrule
+BLT 13.3M, full global cache & 11.06 & 2.1 & 12.46 & 8.4\\
+BLT, 64-patch cache & 10.73 & 0.6 & 10.73 & 0.6\\
+BLT, full cache, plus entropy model & 19.58 & 2.1 & 20.98 & 8.4\\
+BLT, 64-patch cache, plus entropy model & 19.25 & 0.6 & 19.25 & 0.6\\
+BPE transformer 13.8M, full cache & 7.43 & 2.4 & 9.20 & 9.4\\
+BPE transformer, 64-token cache & 6.99 & 0.6 & 6.99 & 0.6\\
+Byte-level transformer, full cache & 30.87 & 9.4 & 59.18 & 37.7\\
+Byte-level transformer, 64-entry cache & 22.02 & 0.6 & 22.02 & 0.6\\
+Byte-level transformer, 288-entry cache (same text span as 64 patches) & 24.08 & 2.7 & 24.08 & 2.7\\
+\bottomrule
+\end{tabular}

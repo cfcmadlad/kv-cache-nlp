@@ -2,6 +2,12 @@
 
 Uses `scripts/demo.py` options 6, 4, 7 and 5. All outputs below were produced on CPU (4 cores, no GPU) on 27 Oct 2026 from a fresh clone of commit 84f9b5d, with the release assets downloaded by the demo itself. Numbers will differ slightly on another CPU or PyTorch build; the ranking of policies on a single text is an anecdote, not the result (see "What to say about single runs").
 
+## Running it on a desktop
+
+Windows: double-click `run.bat`. Linux or macOS: `./run.sh`. Both find Python 3.10 or newer (installing it if missing), reuse an existing PyTorch or build a private environment in `%LOCALAPPDATA%\kv-cache-nlp\venv` (`~/.cache/kv-cache-nlp/venv`), install the requirements and start the menu. The first start needs internet (PyTorch about 200 MB for CPU, plus 138 MB and 124 MB of release assets). Before the viva run `python scripts/check_demo.py`: it checks Python, packages, assets, a forward pass and the option 4 and option 6 code paths in about 5 seconds and prints `[ok]` or `[FAIL]` per item.
+
+Verified on 27 Oct 2026 (Linux, 4 CPU cores, no GPU): a fresh clone with no PyTorch in the system Python ran `run.sh`, built the private environment (about 2 minutes, first time only) and completed option 4; options 1, 2, 3, 4, 5, 6 and 7 all ran from the menu. Not verified by me: `run.bat` on Windows and the launcher on macOS (`CHALLENGES.md` records a Part 2 rehearsal from a fresh unzip that passed). Test both on the machine you will present from. The menu now rejects cache budgets below 10 patches and returns to the menu if an option fails, because a budget of 9 or less used to stop the demo with a traceback.
+
 ## Before the viva (5 minutes, once)
 
 1. `pip install torch --index-url https://download.pytorch.org/whl/cpu` and `pip install -r requirements.txt` (or run `run.bat` / `./run.sh`, which set Python up). The demo itself does not install packages.

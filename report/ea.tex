@@ -19,12 +19,14 @@ WikiText & lowest (55\%) & $+0.0023$ & $+0.0152$ & $+0.0035$\\
 \end{tabular}
 \end{table}
 
-\textbf{Why? Attention.} Figure~\ref{fig:attention} shows the Spearman correlation between the entropy of an old patch (at least 8 patches back) and the attention it receives. It is negative in the middle and upper layers of most models: in all six layers of all three TinyStories seeds ($-0.04$ to $-0.55$), and in layers 2 to 5 of the three prose-only WikiText seeds ($-0.007$ to $-0.39$). In the seed-0 TinyStories model the highest-entropy third of old patches receives about half the attention of the lowest third in layers 1 and 2. The model reads predictable patches more than surprising ones, and surprising bytes are handled by the local windows. This is a correlation, not an intervention, and the WikiText code-mix seed 0 model shows the opposite sign in most layers while its eviction result has the same sign, so it is not a complete account.
+\begin{figure*}[t]
+\centering\includegraphics[width=\textwidth]{figures/fig_kept.pdf}
+\caption{What each rule keeps at the end of a document. Left and middle: share of old patches kept, by entropy tercile; keep-high-entropy keeps only high-entropy patches (and keep-low-entropy the opposite). Right: mean length of the kept patches; the entropy rule keeps one-byte fragments.}\label{fig:kept}
+\end{figure*}
 
-\begin{figure}[t]
-\centering\includegraphics[width=\columnwidth]{figures/fig_attention.pdf}
-\caption{Spearman correlation between patch entropy and the attention received by old patches, per global layer and seed. It is mostly negative in the middle and upper layers: the model reads predictable patches more than surprising ones.}\label{fig:attention}
-\end{figure}
+\textbf{Why? Attention.} Figure~S1 of the supplement (\texttt{report/supplement.pdf}) shows the Spearman correlation between the entropy of an old patch (at least 8 patches back) and the attention it receives. It is negative in the middle and upper layers of most models: in all six layers of all three TinyStories seeds ($-0.04$ to $-0.55$), and in layers 2 to 5 of the three prose-only WikiText seeds ($-0.007$ to $-0.39$). In the seed-0 TinyStories model the highest-entropy third of old patches receives about half the attention of the lowest third in layers 1 and 2. The model reads predictable patches more than surprising ones, and surprising bytes are handled by the local windows. This is a correlation, not an intervention, and the WikiText code-mix seed 0 model shows the opposite sign in most layers while its eviction result has the same sign, so it is not a complete account.
+
+
 
 \textbf{Qualitative.} In the examples \texttt{|} marks a patch boundary; all are real output.
 
@@ -35,3 +37,5 @@ WikiText & lowest (55\%) & $+0.0023$ & $+0.0152$ & $+0.0035$\\
 \emph{Example 3, a locally predictable byte.} In TinyStories document 56 the byte \texttt{d} in \texttt{They argue[d]} costs 0.02 bits with the full cache, 0.01 with recency and 5.97 with keep high entropy. The recent bytes are present (the newest 8 patches are protected), so what changes is the older cache; we hypothesise that a cache of fragments distorts the global state that feeds the decoder even for easy bytes, but we did not test it. A WikiText case: \texttt{to the northeast , i[s]} costs 0.84, 0.86 and 4.15 bits.
 
 \emph{Example 4, where entropy helps.} In TinyStories document 13 the byte \texttt{S} in \texttt{All the animals cheered for [S]am} costs 4.04 bits with the full cache, 7.35 with recency and 3.46 with keep high entropy. The name Sam appears several times earlier in the story. We did not check whether the entropy cache held a patch with the name. Such cases exist but are outweighed on average.
+
+\emph{Example 5, generations that diverge.} We continued the same prompt greedily with the full cache and with 32 (TinyStories) or 64 (WikiText) patches (\texttt{results/part3/generation\_divergence.md}). On TinyStories document 0 the full cache continues \texttt{find your friends."  Roxy was so happy to help Roxy.}; recency diverges at byte 17 (\texttt{find your friends to climb the leaves.}) and random and keep low entropy at byte 10 (\texttt{find your home and they would...}); keep high entropy stays on the full-cache text until byte 25 (\texttt{Roxyy said, "Thank you, Billy.}). On WikiText document 1 recency stays with the full cache until byte 65, whereas random and keep high entropy diverge at the first byte (\texttt{r the 1970 -- 1996 season}). Greedy text from such small models is repetitive (\texttt{the state of the state}), so we read these as evidence of where the compressed cache changes the prediction, not as quality measures: on these four prompts no policy reproduces the true continuation better than the full cache by more than a few bytes, and the examples are anecdotal.

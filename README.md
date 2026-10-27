@@ -3,9 +3,25 @@
 Patch-aware KV cache compression for byte-level language models.
 CS F429 Natural Language Processing, BITS Pilani Hyderabad, Group 12.
 
-Byte-level models read raw UTF-8, so a sentence spans about four times as many positions as in BPE tokens, and the KV cache grows with it. The Byte Latent Transformer (BLT) already computes next-byte entropy to place patch boundaries. This project tests whether that same entropy can decide which cache entries to evict or quantize, compared with recency (StreamingLLM), attention-score methods (H2O, SnapKV) and random eviction at an equal number of cache bytes.
+Byte-level language models read raw UTF-8 and avoid tokenizer failure modes, but a sentence spans about four times as many positions as in BPE tokens, so the key-value (KV) cache, the main deployment bottleneck, grows about four times faster. The Byte Latent Transformer (BLT) groups bytes into patches using next-byte entropy, so the cache holds one entry per patch. This project builds a BLT-style model and evaluates patch-granular cache compression against recency (StreamingLLM), attention-score methods (H2O, SnapKV-style), random eviction and quantization at an equal number of cache bytes.
 
-Part 2 (done) built the data pipeline and two baselines scored in bits per byte (BPB). Part 3 adds the byte-level model, the cache policies and their evaluation. Headline, on small models with three seeds each: using next-byte entropy as the keep signal is negative. Keeping high-entropy patches, or giving them more bits, does worse than random and recency at the same cache bytes in 68 to 70 of 72 comparisons and better in none, the penalty grows about tenfold when the models are trained ten times longer, and uniform 4-bit KV is within 0.0014 BPB of fp16 at 27 percent of the bytes. An attention-based rule (SnapKV-style, scored online) beats recency in all 24 comparisons, and eviction plus 4-bit keeps 7 percent of the WikiText cache for 0.0012 BPB. A fixed-size cache follows documents four times longer than the training context and beats resetting the context. See `docs/results_summary.md`.
+Part 2 (done) built the data pipeline and two baselines scored in bits per byte (BPB). Part 3 adds the byte-level model, the cache policies and their evaluation, with three seeds per setting, paired bootstrap intervals, a test split evaluated once, and tested code.
+
+## Headline results (Part 3)
+
+Small models (13.3M parameters). BPB is bits per byte, lower is better. Tables are in `results/part3/`; the full account is `docs/results_summary.md` and the paper-style report is `report/main.pdf`.
+
+| Result | Number | Evidence |
+|---|---|---|
+| Eviction plus 4-bit quantization | 7.4 percent of the WikiText cache bytes for +0.0012 BPB (SnapKV-style, 128 patches) | `results/part3/deploy_combo.md` |
+| SnapKV-style policy, scored online | Better than recency in 24 of 24 comparisons, by 0.0002 to 0.0077 BPB | `results/part3/online_policies.md` |
+| Bounded-memory streaming | A fixed recency cache beats resetting the context in 3 of 3 seeds on long WikiText documents and by 0.0086 BPB on 20 PG-19 books | `results/part3/stream_16k.md`, `pg19_stream.md` |
+| Measured memory and speed | Global cache 0.59 MB against 136.5 MB at 65,536 bytes; 0.9 ms per byte against a rise to 2.0 ms | `results/part3/deploy_bench.md` |
+| Uniform 4-bit K and V | Within 0.0003 to 0.0014 BPB of fp16 at 27 percent of the bytes | `docs/results_summary.md` |
+| Compute per byte (analytic) | BLT needs 2.8 times fewer FLOPs than a byte-level Transformer of the same width, but more than the BPE Transformer | `results/part3/flops.md` |
+| Entropy-guided retention (the proposal) | Negative: worse than random in 68 and than recency in 70 of 72 comparisons, better in none; the penalty grows about tenfold with ten times more training | `results/part3/seeds.md`, `scale_and_tuning.md`, `docs/error_analysis_part3.md` |
+
+See `docs/results_summary.md` for caveats: small models, no retrieval ability, one seed for the 16k and fixed-stride 30,000-step models.
 
 ## Baseline results
 
@@ -124,6 +140,15 @@ python scripts/error_analysis_part3.py
 cd report && pdflatex main && bibtex main && pdflatex main && pdflatex main
 ```
 
-The LaTeX report is `report/main.tex` (references in `report/references.bib`, figures in `report/figures/`, built `report/main.pdf`). The error analysis is `docs/error_analysis_part3.md` (raw output `results/part3/error_analysis.md`), the analytic compute table is `results/part3/flops.md`, the demo rehearsal script is `docs/demo_script.md` and the viva questions by rubric item are in `docs/viva_by_rubric.md` (collated into `docs/viva_notes.md`).
+```bash
+python scripts/check_demo.py
+python scripts/generation_divergence.py
+python scripts/render_mermaid.py --chromium /path/to/chromium
+cd report && pdflatex supplement && pdflatex slides
+```
+
+`check_demo.py` verifies Python, packages, assets and the demo code paths in seconds; run it on the presentation machine first.
+
+The LaTeX report is `report/main.tex` (references in `report/references.bib`, figures in `report/figures/`, built `report/main.pdf`). The supplement (`report/supplement.pdf`), the slides (`report/slides.pdf`, notes in `docs/presentation_notes.md`) and Mermaid diagrams (`docs/presentation_diagrams.md`, PNGs in `report/presentation/mermaid/`) support the presentation; `docs/proposal_vs_delivered.md` maps the Part 1 proposal to the evidence. The error analysis is `docs/error_analysis_part3.md` (raw output `results/part3/error_analysis.md`), the analytic compute table is `results/part3/flops.md`, the demo rehearsal script is `docs/demo_script.md` and the viva questions by rubric item are in `docs/viva_by_rubric.md` (collated into `docs/viva_notes.md`).
 
 Plan in `PLAN.md`, related work in `NOVELTY.md`, problems and fixes in `CHALLENGES.md`, per-block notes and results in `docs/`.

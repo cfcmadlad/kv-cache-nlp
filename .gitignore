@@ -24,3 +24,8 @@ report/*.blg
 report/*.log
 report/*.out
 report/*.toc
+!report/supplement.pdf
+!report/slides.pdf
+report/*.nav
+report/*.snm
+report/*.vrb

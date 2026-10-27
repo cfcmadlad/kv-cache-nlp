@@ -1,0 +1,25 @@
+{
+  "llama3_8b": {
+    "label": "Llama 3 8B",
+    "layers": 32,
+    "model_dim": 4096,
+    "attention_heads": 32,
+    "kv_heads": 8,
+    "vocab": 128000,
+    "context_tokens": 131072,
+    "nominal_parameters": 8000000000,
+    "weight_bytes_per_parameter": 2,
+    "source": "Llama Team, The Llama 3 Herd of Models, arXiv:2407.21783, Table 3 and Section 3"
+  },
+  "llama2_7b": {
+    "label": "Llama 2 7B",
+    "vocab": 32000,
+    "context_tokens": 4096,
+    "grouped_query_attention": false,
+    "pretraining_tokens": 2000000000000,
+    "source": "Touvron et al., Llama 2, arXiv:2307.09288, Table 1 and tokenizer paragraph"
+  },
+  "assumed_bytes_per_token": 4.0,
+  "kv_bytes_per_element": 2,
+  "context_axis_tokens": [1024, 4096, 16384, 65536, 131072]
+}

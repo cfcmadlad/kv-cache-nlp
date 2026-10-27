@@ -1,61 +1,37 @@
-# Part 3 report text: entropy as a keep signal for byte-level KV caches
+# Part 3 report: summary and evidence map
 
-Draft written 21 Oct 2026, updated 25 Oct from `docs/results_summary.md`. Every number below is in that file or in `results/part3/`. Validation data throughout; the WikiText test split was evaluated once and TinyStories has no test split.
+The submitted report is `report/main.tex` (built `report/main.pdf`, 10 pages with references). This file is a short companion for readers and examiners: the findings in one page, and a map from each assessed item to the evidence that backs it. Every number below is in `docs/results_summary.md` or `results/part3/`. Validation data throughout; the WikiText test split was evaluated once, and TinyStories has no test split.
 
-## 1. Problem and idea
+## Findings
 
-Byte-level language models read raw UTF-8, so a sentence spans about four times as many positions as in BPE tokens and the KV cache grows with it. The Byte Latent Transformer groups bytes into patches using the next-byte entropy of a small model, so that entropy is already computed. We asked whether the same entropy can decide which cache entries to evict or to store at lower precision, compared with recency (a StreamingLLM-style window with a sink), attention-score methods (H2O, SnapKV) and random choice at the same number of cache bytes. The patch is the natural unit: one global cache entry per patch.
+**Setup.** A 13,333,632-parameter BLT-style byte model (entropy or fixed-stride patching, one KV cache entry per patch) with patch-granular cache policies: recency with a sink, random, keep high entropy (the proposal), keep low entropy, H2O and a SnapKV-style rule, plus uniform and tiered quantization. Three seeds per setting, paired bootstrap intervals over documents, 70 passing tests.
 
-Related work (`NOVELTY.md`) uses entropy to set cache budgets or as one term of a mixed score, on subword models; we found no test of entropy-ranked retention on byte-level models. The idea is plausible and cheap, which is why a negative result is informative. The practical question behind it: can a byte-level model run on a long text with a small, fixed amount of memory?
+**What improved.**
+- Eviction plus 4-bit quantization keeps 7.4 percent of the WikiText cache bytes for +0.0012 BPB (SnapKV-style, 128 patches; +0.0019 with recency). Uniform 4-bit alone costs 0.0003 to 0.0014 BPB at 27 percent of the bytes.
+- An online SnapKV-style policy, scored on the model's own attention, beats recency in 24 of 24 comparisons (by 0.0002 to 0.0077 BPB). Online H2O is worse than recency in 22 of 24.
+- A fixed-size cache follows documents four times longer than the training context better than resetting the context (recency, 64 patches: 0.0030, 0.0032 and 0.0008 BPB better in three seeds), and 20 PG-19 books by 0.0086 BPB (256 patches). Measured: global cache 0.59 to 2.36 MB against 136.5 MB at 65,536 bytes, time per byte constant at 0.9 ms against a rise to 2.0 ms.
+- Entropy patching is lower in BPB than fixed stride in 3 of 3 same-seed pairs on WikiText (validation and test); 67 percent of its patch starts are at word starts against 16 to 20 percent by chance. The gap is about one seed range, so we call it likely, not established.
+- The BLT needs 2.8 times fewer FLOPs per byte than a byte-level Transformer of the same width (analytic, `results/part3/flops.md`).
 
-## 2. System
+**What did not work.** Keeping high-entropy patches is worse than random in 68 and than recency in 70 of 72 comparisons, better in none; the penalty against random at 64 patches grows from +0.002 (3,000 steps) to +0.024 to +0.029 (30,000 steps). It holds for fixed-stride models, with the code mix, at 16,384 bytes, on the test split, for a recency-protected variant, and under every scoring-rule ablation. The error analysis shows the rule keeps mostly one- and two-byte fragments and loses on the easy bytes (`docs/error_analysis_part3.md`).
 
-A 13.3M-parameter BLT-style model: a local encoder over bytes (256-byte windows), 6 global transformer layers over patches, and a local decoder. Patches come from a separate 3.3M-parameter byte model (entropy threshold tuned for 4.5 bytes per patch) or from a fixed stride. Incremental decoding equals the full forward pass to 1e-5. Tests check that every eviction and quantization policy, simulated with masks in one pass, equals step-by-step decoding with entries actually removed, and that an online evaluation loop (global layers run patch by patch with a real cache) equals the masked one.
+**Limits.** 13.3M-parameter models; at equal training the BPE Transformer scores lower BPB than this BLT (0.6939 against 0.7980 on TinyStories, 1.5200 against 1.6801 on WikiText); the models do not retrieve (planted-name test); one seed for the 16k and fixed-stride 30,000-step models; PG-19 confounds the entropy signal with distance.
 
-Cache policies share one budget interface and a protected set (the first patch and the 8 newest): recency, random (three draws), keep high entropy (the proposal), keep low entropy (the opposite control), H2O (accumulated attention received) and SnapKV-style (attention from the last 16 patches). The attention policies are scored online during decoding. Precision tiers store K and V at 4 or 2 bits per patch by the same rules, against uniform 2, 3, 4 and 8 bits, and eviction can be combined with quantization. Cache size is computed from entry counts and bit widths, and also measured on the GPU for real eviction.
+## Evidence map by assessed item
 
-## 3. Setup
+| Item | What the report shows | Files |
+|---|---|---|
+| Model novelty | A controlled test of entropy-ranked retention on a byte-level patch model; online attention policies over patch caches; measured bounded-memory streaming; analytic compute count | `NOVELTY.md`, `report/main.pdf` sections 1, 2 and 5, `tests/test_blt.py` |
+| Improvement over the previous technique | Table 1 of the report: against Part 2 baselines, the byte-level Transformer, recency, and context resets | `results/part3/deploy_combo.md`, `online_policies.md`, `stream_16k.md`, `pg19_stream.md`, `deploy_bench.md`, `flops.md` |
+| Results and error analysis | Tables with intervals, three seeds, test split, ten times more training; quantitative error analysis (tercile, byte class, patch length) and real examples | `results/part3/seeds.md`, `test_split.md`, `scale_and_tuning.md`, `error_analysis.md`, `docs/error_analysis_part3.md` |
+| Challenges | Table of 11 challenges with actions and outcomes in the report; 20 entries in full | `CHALLENGES.md` |
+| Demo and viva | CPU demo (options 4, 6, 7, 5) verified from a fresh clone; rehearsal script; questions with file-backed answers | `docs/demo_script.md`, `docs/viva_by_rubric.md`, `docs/viva_notes.md` |
 
-Data: TinyStories (first 500 validation stories) and WikiText-103 (60 validation articles), each with and without 15 percent code in training. Models are small. The main ones are trained for 3,000 steps (100M bytes) with a 4,096-byte context; WikiText models were also trained for 30,000 steps (about 1B bytes) and at 16,384 bytes. BPB is scored on identical documents for every model. Differences are paired over documents with 95 percent bootstrap intervals (2,000 resamples). Three seeds for every patching scheme (entropy, fixed stride 4, fixed stride 5) in all four settings and for the byte-level model; the 30,000-step models have three seeds of entropy patching and one of fixed stride; the 16k models one seed. The WikiText test split was evaluated once, with policies and budgets fixed beforehand.
+## Regenerating
 
-## 4. Results
-
-**Base models.** The BLT-style models reach 0.80 (TinyStories) and 1.68 (WikiText) BPB with entropy patching after 3,000 steps, against 0.69 and 1.52 for the Part 2 BPE transformer. Trained ten times longer on WikiText with code they reach 1.29 to 1.31 BPB, better than that transformer. Entropy patching places 67 percent of patch starts at word starts (chance 16 to 20 percent). Seed spread in BPB is 0.056 on TinyStories and 0.028 on WikiText for entropy patching, and 0.135 and 0.044 for fixed stride 4, so single-seed gaps mean little. With three seeds each, entropy patching is lower than both fixed strides in all three seed pairs on WikiText and ties stride 4 on TinyStories.
-
-**Main result: the proposal is negative.** Keeping high-entropy patches is worse than random and than recency in all three seeds, at every budget, on both datasets, and for fixed-stride models. Over 72 comparisons (nine models in each of four settings, two budgets) it is worse than recency in 70 and than random in 68, with the interval above zero, and never better than either. The paired difference against random is +0.0003 to +0.0245 BPB. Keeping low-entropy patches is better than keeping high-entropy ones in 42 of the 72 comparisons, worse in 19 and indistinguishable in 11, so low-entropy retention is not a reliable alternative. A recency-protected variant (newest half protected, other half chosen by entropy) is worse than recency in 23 of 24 cells and worse than the same split with random patches in all 24.
-
-**More training makes the effect larger, not smaller.** WikiText code-mix models trained for 30,000 steps score 1.2949, 1.2983 and 1.3118 BPB (three seeds). Keeping high entropy costs +0.0287, +0.0284 and +0.0238 BPB against random at 64 patches (3,000 steps: +0.0020), and +0.056, +0.054 and +0.048 against recency, all intervals excluding zero. The penalty of any eviction also grows (recency at 64 patches costs 0.018 BPB over the full cache, from 0.002), and the fixed-stride model shows the same sign. A TinyStories version of this experiment overfits (training file of 26.7 MB, 37 epochs) and is not used.
-
-**A signal that works: attention.** SnapKV-style scoring, accumulated online, beats recency in all 24 comparisons on the 12 entropy-patched models (by 0.0002 to 0.0077 BPB) and never does worse than its offline approximation. For the 30,000-step models it beats recency by -0.005 (64 patches) and -0.002 (128) in all three seeds. H2O is worse than recency in 22 of 24. So a signal beats recency, a little, and it is attention, not entropy.
-
-**Precision and combined compression.** Uniform 4-bit K and V costs 0.0003 to 0.0014 BPB across ten models at 27 percent of the fp16 bytes. Combining eviction and 4-bit, a WikiText cache of 128 patches uses 7.4 percent of the full cache bytes and costs +0.0012 BPB with SnapKV-style eviction (+0.0019 with recency); on TinyStories 64 patches at 4-bit uses 15 percent and costs +0.0049 (+0.0072). With the same budget, keeping high entropy costs +0.015 to +0.022. No setting that keeps high-entropy patches is on the bytes-against-BPB frontier (`results/part3/comparison.md`, `deploy_combo.md`).
-
-**Bounded memory on long text.** With a fixed patch budget, a model trained on 4,096-byte chunks follows 16,384-byte chunks of long WikiText documents (46 validation documents over 8,192 bytes, patch positions four times beyond training) at lower BPB than the full cache with context resets every 4,096 bytes: recency at 64 patches is 0.0008 to 0.0032 BPB better in three seeds, SnapKV-style 0.0032 to 0.0044 better, while random, H2O and keep-high-entropy are worse than recency. Measured on the GPU, a fixed cache holds the global cache at 0.6 to 2.4 MB (64 to 256 patches) while a full cache reaches 137 MB at 65,536 bytes, and decoding time per byte stays at 0.9 ms against a rise to 2.0 ms. The patch cache at full precision is about 0.9 times the size of a BPE transformer cache of the same width, and a byte-level transformer needs about four times more. Fixed costs remain: the 256-byte window caches (786 KB) and the entropy model (about 2.1 MB of cache and 3.3M parameters).
-
-**Long books (PG-19).** On the first 100,000 bytes of 20 PG-19 test books, decoded one byte at a time with a real fixed cache (patch positions up to about 22,000), a recency window of 256 patches beats the context-reset baseline by 0.0086 BPB for the 30,000-step model (0.0054 for the 3,000-step one) and the whole-book full cache by 0.145, because the full cache degrades far beyond the training length. Random and keep-high-entropy selection are worse than recency at every budget (entropy by +0.093 to +0.122, and +0.025 to +0.028 for the short-trained model). The books are out of domain, and keeping old patches also means attending at distances never seen in training, so this does not isolate the entropy signal; renumbering positions inside the cache was not tried.
-
-**Longer context.** The first 16,384-byte models (batch 2) scored worse than the 4k ones and suggested that the entropy penalty fades; tuning on validation (batch 8, learning rate 0.001) gives 1.5843 BPB (entropy patching) and 1.6048 (fixed), and then keeping high entropy is worse than random by +0.016 to +0.021 at 64 to 512 patches. The earlier statement is withdrawn. snap beats recency only at 64 patches here.
-
-**Test split.** On the WikiText test split (62 documents, evaluated once for 18 models) keeping high-entropy patches is worse than random and recency in all 36 cells, and snap (offline) beats recency in 33 of 36, so the validation conclusions hold out of sample.
-
-**Code mix and ablations.** Prose-only models cannot read code (7 to 8 BPB), so the WikiText and TinyStories models were retrained with 15 percent code (three seeds, fixed-stride controls). The BLT loses about 0.05 BPB on WikiText and 0.09 on TinyStories; keeping high entropy is still worse than random and recency. The ablations (three seeds now): the model's own entropy, the first-byte score, the mean score and sink sizes 0 and 4 are worse than random in all three seeds on both datasets; the maximum is worse in 3 of 3 (WikiText) and 2 of 3 (TinyStories) seeds; the sum rule is never worse than random on TinyStories (one seed is better, by 0.0024) and worse on WikiText. A byte-level cache (one entry per byte) loses much more than a patch cache at equal entry counts: at 32 entries recency costs +0.229 BPB against +0.013 with patches. Patches win per byte of cache; bytes win only with about 4.5 times more cache.
-
-**Retrieval.** In a planted-name test (a random four-syllable name introduced early and repeated after 400 to 3,000 filler bytes) the models do not use the earlier mention even with a full cache, including the 30,000-step models, so nothing about retrieval can be concluded at this size. The entropy rule does keep the planted name's patches more often than random does (45 against 31 percent at 64 patches and a distance of 400 bytes), but the model gains nothing from them.
-
-## 5. Error analysis
-
-Why is entropy a poor keep signal? Attention received by old patches correlates negatively with patch entropy in layers 2 to 5 of all three prose-only WikiText seeds and in all six layers of all three TinyStories seeds; the highest-entropy third receives about half the attention of the lowest third in two layers of the TinyStories seed-0 model. The model reads predictable patches more than surprising ones, and surprising bytes are largely handled by the local windows. This is a correlation; no intervention tests it. The WikiText code-mix seed 0 model shows the opposite sign in most layers while its eviction outcome has the same sign, so the mechanism is not a complete account. Other limitations are listed in section 7.
-
-## 6. Challenges and how we handled them
-
-Full list with strategy and outcome in `CHALLENGES.md`. The ones that shaped the result: a cache accounting error that halved the byte shares of full caches (found by putting eviction and quantization rows in one table, fixed, all tables regenerated, BPB unchanged), seed variance as large as some headline gaps (the earlier TinyStories patching comparison was withdrawn), an uninformative first code evaluation, a first set of 16k models that were under-trained (their conclusion was withdrawn after tuning), a TinyStories long-training run that overfit, a cluster that needed a new environment before any job ran, and an out-of-memory failure when two 45 GB trainings shared a GPU.
-
-## 7. Limitations and what would settle them
-
-- Small models. Most results use 3,000 training steps; the 30,000-step WikiText models show the same sign with larger effects, but a model several times bigger or a task that needs retrieval could behave differently. Retrieval is untested because these models do not retrieve.
-- TinyStories has no usable long-training result and no test split.
-- Cache sizes are computed from entry counts, and real eviction was measured only for recency; quantization is simulated by rounding.
-- Seed 0 trained on a different GPU from seeds 1 and 2 for the prose-only models; evaluation of the same checkpoint gave identical BPB on both GPUs.
-- The 30,000-step fixed-stride and the 16k models have one seed; the long-streaming runs use three seeds of one setting.
-- Attention policies are scored from attention averaged over heads and layers; other aggregations were not tried. They were not run on PG-19 because the step-decoding path has no attention policies, and PG-19 uses WikiText-trained models on out-of-domain text with 20 books.
-- The cluster requeue path (signal, checkpoint, requeue, resume) was verified end to end under one job id with a 24,000-step run; resume equality with an uninterrupted run is covered by a local test, not on the cluster.
+```bash
+python report/make_figures.py
+python scripts/flops.py
+python scripts/error_analysis_part3.py
+cd report && pdflatex main && bibtex main && pdflatex main && pdflatex main
+```
