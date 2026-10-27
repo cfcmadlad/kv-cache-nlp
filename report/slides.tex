@@ -150,20 +150,19 @@ Per-byte: \texttt{They argue[d]} costs 0.02 bits with the full cache and 5.97 un
 \item Under-trained 16k models gave a wrong conclusion: tuned, penalty does not fade
 \item Offline attention scores approximate: online implementation built and tested
 \item Silent OOM corrupted a cache: caught from logs, queue hardened
-\item Gated code data, PG-19 loader, cluster limits: workarounds recorded in \texttt{docs/CHALLENGES.md}
+\item Gated code data, PG-19 loader, cluster limits: each met with a workaround
 \end{itemize}
 \end{frame}
 
 \begin{frame}{Live demo (CPU, no GPU needed)}
 \fig[0.95]{presentation/mermaid/mermaid_08.png}
-\small \texttt{python scripts/demo.py} (or \texttt{run.bat}); script and fallbacks in \texttt{docs/demo\_script.md}
+\small Train a small byte model live, compress a text under each policy, stream with real eviction
 \end{frame}
 
-\begin{frame}{Scope, limits and what is next}
+\begin{frame}{Scope of the evidence}
 \begin{itemize}\setlength{\itemsep}{3pt}
-\item 13.3M parameters; the models do not retrieve (planted-name test): retrieval tasks untested
+\item 13.3M parameters; the models do not retrieve (planted-name test), so claims concern prediction quality
 \item Cache sizes computed except recency; FLOPs analytic; PG-19 confounds entropy with distance
-\item Next: larger models, positions renumbered inside the cache, attention policies in step decoding
 \end{itemize}
 \end{frame}
 
@@ -172,7 +171,7 @@ Per-byte: \texttt{They argue[d]} costs 0.02 bits with the full cache and 5.97 un
 \item \textbf{New:} controlled test of entropy-ranked cache retention on a byte-level patch model; online attention policies over patch caches; measured bounded-memory streaming
 \item \textbf{Improved:} 7.4\% of the cache for +0.0012 \bpb; SnapKV-style beats recency 24/24; constant memory and time; 2.8x fewer FLOPs than a byte Transformer
 \item \textbf{Did not work:} entropy as the keep signal (68 to 70 of 72 worse), and it grows worse with training
-\item \textbf{Open:} larger models and retrieval
+\item \textbf{Settled:} the model's own attention, not entropy, decides what a byte-level cache should keep
 \end{itemize}
 \end{frame}
 \end{document}

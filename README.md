@@ -3,9 +3,9 @@
 *Patch-aware compression of the key-value cache in byte-level language models.*
 CS F429 Natural Language Processing, BITS Pilani Hyderabad Campus. Group 12.
 
-A language model that consumes raw bytes dispenses with the tokenizer, that fastidious intermediary which stumbles over every word it has not previously met. The dispensation is not free. A sentence of a hundred subword tokens swells, when spelled in bytes, to something near four hundred positions, and the memory in which a decoder hoards its keys and values (the KV cache, the true bottleneck of deployment) swells in lockstep. The Byte Latent Transformer softens the blow by gathering bytes into patches, one cache entry apiece, and it does so by consulting the entropy of the next byte, a quantity that is computed and then, with a certain prodigality, thrown away.
+Byte-level language models dispense with the tokenizer and therefore avoid its failures on rare words, typographical errors, code and non-Latin scripts. The cost is sequence length: a sentence of one hundred subword tokens occupies roughly four hundred byte positions, and the key-value (KV) cache that a decoder maintains during generation, which is the main memory bottleneck at deployment, grows in proportion. The Byte Latent Transformer (BLT) reduces the cache by grouping bytes into patches and keeping one cache entry per patch. It places patch boundaries using the entropy of the next-byte distribution, a quantity that is computed and then discarded.
 
-This repository asks whether that discarded entropy deserves a second career as a verdict on which cache entries to keep, and answers with a small BLT-style model, a half-dozen eviction and quantization policies, three seeds of everything, and a conscience. The answer is a plain no, delivered with some precision; the same apparatus, however, uncovered four results of real and practical value (below). Part 2 supplied the data pipeline and two baselines; Part 3, which this repository chiefly documents, supplies the byte model, the cache policies and their trial.
+This project examines whether that entropy can also decide which cache entries to retain. It uses a small BLT-style model, six eviction policies, several quantization schemes, and three seeds for every setting. The hypothesis is refuted: entropy-ranked retention is worse than both random selection and recency. The same experimental protocol did, however, produce four results of practical value (below). Part 2 provided the data pipeline and two baselines; Part 3, which this repository mainly documents, provides the byte model, the cache policies and their evaluation.
 
 ## Findings in brief
 
@@ -21,7 +21,7 @@ Small models (13.3M parameters). BPB is bits per byte; lower is better. The full
 | Compute per byte (analytic) | 2.8 times fewer FLOPs than a byte-level Transformer of equal width, though more than the BPE Transformer | `results/part3/flops.md` |
 | Entropy as the keep signal (the original hypothesis) | Refuted: worse than random in 68 and than recency in 70 of 72 comparisons, better in none; the penalty grows about tenfold with tenfold training | `results/part3/seeds.md`, `scale_and_tuning.md`, `docs/error_analysis.md` |
 
-The caveats are as honest as the figures: the models are small, they do not retrieve (a planted-name probe could not tell any policy from another), the 16k and fixed-stride 30,000-step models have a single seed, and at equal training the BPE Transformer still outscores our byte model.
+The scope of these results is limited as follows: the models are small; they do not retrieve named facts (a planted-name probe could not distinguish any policy from another); the 16k and fixed-stride 30,000-step models have a single seed; and at equal training the BPE Transformer still outperforms our byte model.
 
 ## Baselines (Part 2)
 
@@ -33,15 +33,15 @@ BPB on identical documents; lower is better.
 | WikiText-103 val, 60 docs | 2.4103 | 1.5200 |
 | WikiText-103 test, 62 docs | 2.4381 | 1.5309 |
 
-The Transformer has 6 layers, 6 heads, width 384, an 8k byte-level BPE vocabulary and a 256-token context, and was trained for 3,000 AdamW steps at lr 3e-4 without gradient clipping. The first token of every 256-token chunk serves as context only while its bytes are still counted, which flatters its BPB by 0.4 to 0.5 percent on these sets (far more on very short inputs); corrected values are in `docs/CHALLENGES.md`.
+The Transformer has 6 layers, 6 heads, width 384, an 8k byte-level BPE vocabulary and a 256-token context, and was trained for 3,000 AdamW steps at learning rate 3e-4 without gradient clipping. The first token of every 256-token chunk serves only as context while its bytes are still counted, which makes its BPB optimistic by 0.4 to 0.5 percent on these sets (substantially more on very short inputs); corrected values are given in `docs/CHALLENGES.md`.
 
 ## Requirements
 
-Python 3.10 or newer; PyTorch 2.x; `numpy`, `tokenizers`, `tqdm` (listed in `requirements.txt`; `pytest` in `requirements-dev.txt`). A GPU is not needed for the demo, the analyses or the figures. The training runs behind the tables used a laptop GPU (seed 0 of the prose-only models) and a cluster GPU (everything else). Rebuilding the report needs LaTeX (on Debian we installed `texlive-latex-recommended`, `texlive-latex-extra`, `texlive-fonts-recommended` and `texlive-science`).
+Python 3.10 or newer and PyTorch 2.x are required, together with `numpy`, `tokenizers` and `tqdm` (listed in `requirements.txt`; `pytest` is in `requirements-dev.txt`). A GPU is not needed for the demonstration, the analyses or the figures. The training runs behind the tables used a laptop GPU (seed 0 of the prose-only models) and a cluster GPU (all other runs). Rebuilding the report requires LaTeX (on Debian: `texlive-latex-recommended`, `texlive-latex-extra`, `texlive-fonts-recommended` and `texlive-science`).
 
 ## Running the trained models
 
-This is all that is needed to see the final models at work; no GPU, no training and no data download beyond the two release archives.
+The following steps are sufficient to run the final models; no GPU, no training and no data download beyond the two release archives are required.
 
 ```bash
 git clone https://github.com/cfcmadlad/kv-cache-nlp.git && cd kv-cache-nlp
@@ -189,7 +189,7 @@ Git-ignored and fetched or generated on demand: `checkpoints/` and `data/process
 
 ## Data
 
-TinyStories (30,000 train stories, 21,990 validation) and WikiText-103 (articles rebuilt from the raw line export, placeholder tokens such as `@-@` restored), Unicode NFC normalised, exact duplicates removed. Part 3 adds The Stack Smol for code (28,229 files) and PG-19 (the `emozilla/pg19` mirror of the test split, 100 books) for long-book streaming. Corpora keep the licences of their sources; consult them before redistributing any derived data.
+TinyStories (30,000 training stories, 21,990 validation stories) and WikiText-103 (articles rebuilt from the raw line export, with placeholder tokens such as `@-@` restored) are NFC-normalised and deduplicated. Part 3 adds The Stack Smol for code (28,229 files) and PG-19 (the `emozilla/pg19` mirror of the test split, 100 books) for long-document streaming. Each corpus remains subject to the licence of its source; consult it before redistributing derived data.
 
 ## Where to read next
 
@@ -207,7 +207,7 @@ TinyStories (30,000 train stories, 21,990 validation) and WikiText-103 (articles
 ## Troubleshooting
 
 * *The demo cannot find the models.* Run it once with the internet available, or place the two release zips as described above; `python scripts/fetch_assets.py --force` re-downloads the first set.
-* *Option 7 is glacial.* It is compute-bound; close other heavy programs (with a competing process it ran more than an order of magnitude slower).
+* *Option 7 is slow.* It is compute-bound; close other demanding programs (with a competing process it ran more than ten times slower).
 * *Antivirus quarantines `run.bat`.* Allow it in the antivirus history, or install the requirements by hand as in the quick start.
 * *`playwright` cannot launch a browser.* Pass an existing Chromium with `--chromium`; the PNGs for the slides are already committed.
 * *Tests or scripts import errors.* Run them from the repository root so that `kvc`, `models` and `scripts` resolve.

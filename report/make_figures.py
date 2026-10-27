@@ -15,7 +15,7 @@ SEED_STYLE = {0: ("o", "-"), 1: ("s", "--"), 2: ("^", ":")}
 
 plt.rcParams.update({"font.family": "serif", "font.serif": ["cmr10"], "font.monospace": ["cmtt10"], "mathtext.fontset": "cm", "axes.formatter.use_mathtext": True, "axes.unicode_minus": False, "font.size": 8, "axes.titlesize": 8.5, "axes.labelsize": 8, "legend.fontsize": 7, "xtick.labelsize": 7.5, "ytick.labelsize": 7.5,
                      "axes.spines.top": False, "axes.spines.right": False, "axes.grid": True, "grid.alpha": 0.25, "grid.linewidth": 0.5,
-                     "pdf.fonttype": 42, "figure.dpi": 150, "savefig.bbox": "tight"})
+                     "pdf.fonttype": 42, "figure.dpi": 150, "savefig.pad_inches": 0.0})
 
 
 def num(s: str) -> float:
@@ -63,7 +63,7 @@ def save(fig, name: str, outdir: Path):
 def fig_frontier(outdir: Path):
     base = {t["title"].split()[0]: t["rows"] for t in tables("comparison.md")}
     combo = {t["title"].split()[0]: t["rows"] for t in tables("deploy_combo.md")}
-    fig, axes = plt.subplots(1, 2, figsize=(7.1, 2.5), sharey=False)
+    fig, axes = plt.subplots(1, 2, figsize=(6.87, 2.6), sharey=False)
     ticks = {"tinystories": [100, 200, 400, 800], "wikitext103": [150, 300, 600, 1200, 2400]}
     for ax, ds, title in zip(axes, ("tinystories", "wikitext103"), ("TinyStories", "WikiText-103")):
         series = {}
@@ -94,15 +94,15 @@ def fig_frontier(outdir: Path):
     axes[0].set_ylabel("BPB cost over full cache")
     handles = [plt.Line2D([], [], color=COLORS[k], lw=1.5, label=LABELS[k]) for k in ("recency", "random", "entropy", "snap", "uniform")]
     handles += [plt.Line2D([], [], color="k", marker="o", ls="-", ms=3.5, label="eviction, fp16"), plt.Line2D([], [], color="k", marker="s", ls="--", mfc="white", ms=3.5, label="eviction + 4-bit")]
-    fig.legend(handles=handles, loc="lower center", ncol=7, frameon=False, bbox_to_anchor=(0.5, -0.1))
-    fig.tight_layout()
+    fig.legend(handles=handles, loc="lower center", ncol=7, frameon=False, bbox_to_anchor=(0.5, 0.0))
+    fig.tight_layout(rect=(0, 0.1, 1, 1))
     save(fig, "fig_frontier.pdf", outdir)
 
 
 def fig_scale(outdir: Path):
     rows = [r for t in tables("scale_and_tuning.md") if t["rows"] and "Steps" in t["rows"][0] for r in t["rows"]]
     rows = [r for r in rows if r["Model"].startswith("blt_wikitext103mix_") and r["Budget"] == "64"]
-    fig, axes = plt.subplots(1, 2, figsize=(7.1, 2.3))
+    fig, axes = plt.subplots(1, 2, figsize=(6.87, 2.6))
     groups = {}
     for r in rows:
         name = r["Model"]
@@ -127,13 +127,13 @@ def fig_scale(outdir: Path):
         ax.axhline(0, color="k", lw=0.6)
     axes[0].set_ylabel("BPB difference (95% CI)")
     handles, labels = axes[1].get_legend_handles_labels()
-    fig.legend(handles, labels, loc="lower center", ncol=4, frameon=False, bbox_to_anchor=(0.5, -0.1))
-    fig.tight_layout()
+    fig.legend(handles, labels, loc="lower center", ncol=4, frameon=False, bbox_to_anchor=(0.5, 0.0))
+    fig.tight_layout(rect=(0, 0.1, 1, 1))
     save(fig, "fig_scale.pdf", outdir)
 
 
 def fig_stream(outdir: Path):
-    fig, axes = plt.subplots(1, 2, figsize=(7.1, 2.3))
+    fig, axes = plt.subplots(1, 2, figsize=(6.87, 2.6))
     ax = axes[0]
     acc = {}
     for t in tables("stream_16k.md"):
@@ -170,15 +170,15 @@ def fig_stream(outdir: Path):
     ax.set_title("PG-19, 20 books (black: whole-book full cache)")
     handles = [plt.Line2D([], [], color=COLORS[k], marker="o", ms=3.5, lw=1.2, label=LABELS[k]) for k in ("recency", "snap", "random", "h2o", "entropy")]
     handles += [plt.Line2D([], [], color="k", lw=1.2, ls="-", label="PG-19, 30,000-step model"), plt.Line2D([], [], color="k", lw=1.2, ls=":", label="PG-19, 3,000-step model")]
-    fig.legend(handles=handles, loc="lower center", ncol=7, frameon=False, bbox_to_anchor=(0.5, -0.1))
-    fig.tight_layout()
+    fig.legend(handles=handles, loc="lower center", ncol=7, frameon=False, bbox_to_anchor=(0.5, 0.0))
+    fig.tight_layout(rect=(0, 0.1, 1, 1))
     save(fig, "fig_stream.pdf", outdir)
 
 
 def fig_memory(outdir: Path):
     mem = tables("deploy_memory.md")[0]["rows"]
     bench = tables("deploy_bench.md")[0]["rows"]
-    fig, axes = plt.subplots(1, 3, figsize=(7.1, 2.0))
+    fig, axes = plt.subplots(1, 3, figsize=(6.87, 2.6))
     ax = axes[0]
     ctx = [num(r["Context (bytes)"]) for r in mem]
     cols = [("Byte-level Transformer, full", "#D55E00", "byte-level Transformer"), ("BPE Transformer, full", "#E69F00", "BPE Transformer"), ("BLT patches, full fp16", "#0072B2", "BLT, full"),
@@ -190,7 +190,7 @@ def fig_memory(outdir: Path):
     ax.set_xlabel("Context (bytes)")
     ax.set_ylabel("KV cache per sequence (MB)")
     ax.set_title("Computed")
-    ax.legend(frameon=False, fontsize=5.8, loc="upper left")
+    ax.legend(frameon=False, fontsize=6, loc="upper center", bbox_to_anchor=(0.5, -0.3), ncol=2, columnspacing=0.8, handlelength=1.2)
     ax = axes[1]
     series = {}
     for r in bench:
@@ -205,8 +205,8 @@ def fig_memory(outdir: Path):
         a.set_ylabel(ylabel)
         a.set_title(title)
     axes[1].set_yscale("log")
-    axes[1].legend(frameon=False, fontsize=6, loc="upper left")
-    fig.tight_layout()
+    axes[1].legend(frameon=False, fontsize=6, loc="upper center", bbox_to_anchor=(0.5, -0.3), ncol=2, columnspacing=0.8, handlelength=1.2)
+    fig.subplots_adjust(left=0.075, right=0.99, top=0.9, bottom=0.36, wspace=0.34)
     save(fig, "fig_memory.pdf", outdir)
 
 
@@ -215,7 +215,7 @@ def fig_attention(outdir: Path):
              "WikiText-103": ["attention_wikitext.md", "attention_blt_wikitext103_entropy_s1.md", "attention_blt_wikitext103_entropy_s2.md"],
              "TinyStories, code mix": ["attention_tinystories_mix.md"],
              "WikiText-103, code mix": ["attention_wikitext_mix.md", "attention_blt_wikitext103mix_entropy_s1.md", "attention_blt_wikitext103mix_entropy_s2.md"]}
-    fig, axes = plt.subplots(2, 2, figsize=(3.5, 3.3), sharey=True, sharex=True)
+    fig, axes = plt.subplots(2, 2, figsize=(3.3, 3.3), sharey=True, sharex=True)
     for ax, (title, files) in zip(axes.flat, names.items()):
         for seed, f in enumerate(files):
             rows = tables(f)[0]["rows"]
@@ -257,7 +257,7 @@ def fig_scoreboard(outdir: Path):
             ("High entropy vs random (test)", count(test, "entropy - random")),
             ("SnapKV-style vs recency", count(online, "snap on - recency")),
             ("H2O vs recency", count(online, "h2o on - recency"))]
-    fig, ax = plt.subplots(figsize=(3.5, 2.3))
+    fig, ax = plt.subplots(figsize=(3.3, 2.6))
     labels = [r[0] for r in rows]
     ypos = list(range(len(rows)))[::-1]
     for y, (label, (b, t, w)) in zip(ypos, rows):
@@ -275,14 +275,14 @@ def fig_scoreboard(outdir: Path):
     ax.set_xlabel("Share of paired comparisons")
     ax.grid(False)
     handles = [plt.Rectangle((0, 0), 1, 1, color=c) for c in ("#0072B2", "#BDBDBD", "#D55E00")]
-    fig.legend(handles, ["policy better", "no clear difference", "policy worse"], loc="lower center", ncol=3, frameon=False, bbox_to_anchor=(0.5, -0.1))
-    fig.tight_layout()
+    fig.legend(handles, ["policy better", "no clear difference", "policy worse"], loc="lower center", ncol=3, frameon=False, bbox_to_anchor=(0.5, 0.0))
+    fig.tight_layout(rect=(0, 0.1, 1, 1))
     save(fig, "fig_scoreboard.pdf", outdir)
 
 
 def fig_terciles(outdir: Path):
     ts = [t for t in tables("error_analysis.md") if t["sub"] and t["sub"].startswith("BPB by entropy tercile")]
-    fig, axes = plt.subplots(1, 2, figsize=(7.1, 2.4), sharey=False)
+    fig, axes = plt.subplots(1, 2, figsize=(6.87, 2.6), sharey=False)
     for ax, t, name in zip(axes, ts, ("TinyStories, 32 patches", "WikiText-103, 64 patches")):
         rows = t["rows"]
         pols = [("recency", "recency"), ("random", "random"), ("entropy", "keep high entropy"), ("entropy_inv", "keep low entropy")]
@@ -294,15 +294,15 @@ def fig_terciles(outdir: Path):
         ax.set_xlabel("Entropy tercile of the patch holding the byte")
     axes[0].set_ylabel("Extra BPB over the full cache")
     handles, labels = axes[0].get_legend_handles_labels()
-    fig.legend(handles, labels, loc="lower center", ncol=4, frameon=False, bbox_to_anchor=(0.5, -0.1))
-    fig.tight_layout()
+    fig.legend(handles, labels, loc="lower center", ncol=4, frameon=False, bbox_to_anchor=(0.5, 0.0))
+    fig.tight_layout(rect=(0, 0.1, 1, 1))
     save(fig, "fig_terciles.pdf", outdir)
 
 
 def fig_kept(outdir: Path):
     kept = [t for t in tables("error_analysis.md") if t["sub"] and t["sub"].startswith("Which patches") and "Policy" in t["rows"][0] and "lowest third" in t["rows"][0]]
     length = [t for t in tables("error_analysis.md") if t["sub"] and t["sub"].startswith("Which patches") and "Mean kept patch length (bytes)" in t["rows"][0]]
-    fig, axes = plt.subplots(1, 3, figsize=(7.1, 2.0))
+    fig, axes = plt.subplots(1, 3, figsize=(6.87, 2.6))
     for ax, t, name in zip(axes[:2], kept, ("TinyStories, 32 patches", "WikiText-103, 64 patches")):
         rows = {r["Policy"]: r for r in t["rows"]}
         width = 0.25
@@ -321,8 +321,8 @@ def fig_kept(outdir: Path):
     ax.set_ylabel("Mean length of kept patches (bytes)")
     ax.set_title("Patch length of what is kept", fontsize=7.5)
     handles = [plt.Rectangle((0, 0), 1, 1, color=COLORS[k]) for k in ("recency", "entropy", "entropy_inv")]
-    fig.legend(handles, [LABELS[k] for k in ("recency", "entropy", "entropy_inv")], loc="lower center", ncol=3, frameon=False, bbox_to_anchor=(0.5, -0.1))
-    fig.tight_layout()
+    fig.legend(handles, [LABELS[k] for k in ("recency", "entropy", "entropy_inv")], loc="lower center", ncol=3, frameon=False, bbox_to_anchor=(0.5, 0.0))
+    fig.tight_layout(rect=(0, 0.1, 1, 1))
     save(fig, "fig_kept.pdf", outdir)
 
 
@@ -333,7 +333,7 @@ def fig_models(outdir: Path):
             ("BPE\nTransf.", gate["BPE transformer 13.8M, reported"], "#E69F00"),
             ("BLT\nstride 4", gate["BLT 13.3M, fixed stride 4"], "#56B4E9"),
             ("BLT\nentropy", gate["BLT 13.3M, entropy patching (seed 0)"], "#0072B2")]
-    fig, axes = plt.subplots(1, 2, figsize=(7.1, 2.4))
+    fig, axes = plt.subplots(1, 2, figsize=(6.87, 2.4))
     for ax, key, name in zip(axes, ("TinyStories", "WikiText"), ("TinyStories val", "WikiText-103 val")):
         vals = [(label, num(r[key]), color) for label, r, color in rows]
         if key == "WikiText":
@@ -366,7 +366,7 @@ def tables_md(path: Path) -> list:
 
 
 def fig_seeds(outdir: Path):
-    fig, axes = plt.subplots(1, 2, figsize=(7.1, 2.3))
+    fig, axes = plt.subplots(1, 2, figsize=(6.87, 2.6))
     for ax, ds, title in zip(axes, ("tinystories", "wikitext103"), ("TinyStories", "WikiText-103")):
         sec = [t for t in tables("seeds.md") if t["title"] == ds][0]
         full = {}
@@ -382,8 +382,8 @@ def fig_seeds(outdir: Path):
         ax.set_xticks(range(3), ["entropy\npatching", "fixed\nstride 4", "fixed\nstride 5"])
         ax.set_title(title)
     axes[0].set_ylabel("Full-cache BPB (3,000 steps)")
-    fig.legend([plt.Line2D([], [], marker=SEED_STYLE[s][0], ls="", color="#555555", label=f"seed {s}") for s in (0, 1, 2)] + [plt.Line2D([], [], color="#D55E00", lw=1.4, label="mean of 3 seeds")], ["seed 0", "seed 1", "seed 2", "mean of 3 seeds"], loc="lower center", ncol=4, frameon=False, bbox_to_anchor=(0.5, -0.1))
-    fig.tight_layout()
+    fig.legend([plt.Line2D([], [], marker=SEED_STYLE[s][0], ls="", color="#555555", label=f"seed {s}") for s in (0, 1, 2)] + [plt.Line2D([], [], color="#D55E00", lw=1.4, label="mean of 3 seeds")], ["seed 0", "seed 1", "seed 2", "mean of 3 seeds"], loc="lower center", ncol=4, frameon=False, bbox_to_anchor=(0.5, 0.0))
+    fig.tight_layout(rect=(0, 0.1, 1, 1))
     save(fig, "fig_seeds.pdf", outdir)
 
 
@@ -397,7 +397,7 @@ def fig_public(outdir: Path):
     per_token_full_heads = 2 * m["layers"] * m["attention_heads"] * head_dim * b
     weights_gb = m["nominal_parameters"] * m["weight_bytes_per_parameter"] / 1e9
     ctx = cfg["context_axis_tokens"]
-    fig, axes = plt.subplots(1, 2, figsize=(7.1, 2.4), gridspec_kw={"width_ratios": [1.1, 1]})
+    fig, axes = plt.subplots(1, 2, figsize=(6.87, 2.4), gridspec_kw={"width_ratios": [1.1, 1]})
     ax = axes[0]
     ax.plot(ctx, [c * per_token / 1e9 for c in ctx], marker="o", ms=3.5, color="#0072B2", label=f"{m['label']} KV cache (grouped-query, {m['kv_heads']} KV heads)")
     ax.plot(ctx, [c * per_token_full_heads / 1e9 for c in ctx], ls=":", color="#0072B2", label="same, one KV head per attention head (hypothetical)")
@@ -442,7 +442,7 @@ def fig_entries(outdir: Path):
         spans.append((used, len(p)))
         chars.extend(p)
         used += len(p)
-    fig, ax = plt.subplots(figsize=(7.1, 1.7))
+    fig, ax = plt.subplots(figsize=(6.87, 1.7))
     for i, c in enumerate(chars):
         ax.add_patch(plt.Rectangle((i, 1.0), 0.92, 0.8, fc="#E6E6E6", ec="#7F7F7F", lw=0.5))
         ax.text(i + 0.46, 1.4, "_" if c == " " else c, ha="center", va="center", fontsize=6.5, family="monospace")

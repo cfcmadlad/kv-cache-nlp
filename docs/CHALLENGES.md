@@ -1,13 +1,13 @@
 # Challenges, and what became of them
 
-Every entry follows one cadence: the problem, its impact, our action, the outcome. Most of these obstacles were discovered by our own checks (a cross-table comparison, a causality test, a perusal of logs, a repetition of seeds) before they could corrupt a published conclusion. Where a conclusion had to be retracted it is marked **corrected**; such retractions are the process working as intended, and the figures in `docs/results_summary.md` reflect the amended state.
+Each entry gives the problem, its impact, our action and the outcome. Most of these difficulties were found by our own checks (a cross-table comparison, a causality test, a review of logs, a repetition of seeds) before they could affect a published conclusion. Where an earlier statement had to be withdrawn it is marked **corrected**, and the figures in `docs/results_summary.md` reflect the corrected state.
 
 ## Overview
 
 | # | Challenge | Phase | Outcome |
 |---|---|---|---|
 | 1 | Part 2 BPB slightly flattering | Part 2 | Disclosed; corrected values published |
-| 2 | Baseline trained without gradient clipping | Part 2 | Reproducible; baseline a trifle weaker, as stated |
+| 2 | Baseline trained without gradient clipping | Part 2 | Reproducible; baseline slightly weaker, as stated |
 | 3 | WikiText-103 lacks document boundaries | Part 2 | Articles rebuilt and verified |
 | 4 | Release bundle size | Part 2 | 138 MB bundle; full corpus rebuildable |
 | 5 | Demo must run on an unknown machine | Part 2 | Fresh-clone rehearsals pass |
@@ -45,32 +45,32 @@ No separate Part 1 difficulties were recorded; the team confirmed (27 Oct 2026) 
 - Problem: the two reported checkpoints were trained before clipping was added.
 - Impact: a rerun with clipping at 1.0 gives 0.6826 on TinyStories instead of 0.6939, so the baseline is slightly weaker than it might have been.
 - Action: added a `--grad-clip` flag, where 0 reproduces the reported checkpoints exactly; the reported runs keep clip 0.
-- Outcome: the reported numbers reproduce. The handicapped baseline favours the Part 3 model if it favours anything, and the report says so.
+- Outcome: the reported numbers reproduce. The weaker baseline, if anything, favours the Part 3 model, and the report states this.
 
 ### 3. Building WikiText-103 documents
 
-- Problem: the raw line export has no document boundaries and employs placeholder tokens such as `@-@`.
+- Problem: the raw line export has no document boundaries and uses placeholder tokens such as `@-@`.
 - Impact: corrupted text would distort byte counts and BPB.
 - Action: rebuilt articles from the line export, restored the placeholders, applied NFC normalisation and exact deduplication.
 - Outcome: documents usable; byte counts recorded in `stats.json`.
 
 ### 4. Release bundle size
 
-- Problem: the full WikiText-103 train set makes a ponderous release bundle and a slow first download for the demo.
+- Problem: the full WikiText-103 train set makes a large release bundle and a slow first download for the demo.
 - Impact: demo training on WikiText would not match the original run.
 - Action: the release copy cuts train to 3,000 documents (138 MB zip, SHA-256 checked); the full corpus rebuilds with `prepare_data.py`. The team confirmed (27 Oct 2026) that this was our choice of bundle size, not a platform limit.
 - Outcome: the demo works offline from the bundle.
 
 ### 5. Demo robustness
 
-- Problem: the examiner runs our code on a machine of unknown provenance.
+- Problem: the code is run on a machine whose configuration is unknown.
 - Impact: a missing Python or PyTorch would sink the demonstration.
 - Action: `run.bat` and `run.sh` find or install Python and reuse or build a PyTorch environment; `demo.py` fetches its own assets; model loading is hardened (restricted unpickler, `weights_only=True`).
 - Outcome: an offline rehearsal from a fresh unzip passed, and options 1 to 7 were rerun on CPU from a fresh clone on 27 Oct 2026 (`docs/demo_script.md`). Antivirus software killed or quarantined installer-starting scripts and test wrappers during earlier testing.
 
 ### 6. Cluster access
 
-- Problem: on 2026-09-21 the QOS carried `MaxSubmitJobsPerUser=0`, so that no job could be submitted.
+- Problem: on 2026-09-21 the QOS carried `MaxSubmitJobsPerUser=0`, so no job could be submitted.
 - Impact: Part 2 training ran on a laptop RTX 4060.
 - Action: on 2026-10-09 we found that `sbatch --test-only` succeeds once the job requests `--gres=mps:50`; the limits are 4 CPUs, half a GPU, 80 GB of RAM and a two-day wall time.
 - Outcome: the cluster became usable for Part 3.
@@ -80,9 +80,9 @@ No separate Part 1 difficulties were recorded; the team confirmed (27 Oct 2026) 
 ### 7. Cluster limits shape the design
 
 - Problem: one job at a time, a two-day wall time, queueing behind other users, shared CUDA modules only up to 12.1.
-- Impact: a lost or timed-out job could squander days.
+- Impact: a lost or timed-out job could waste days of compute.
 - Action: every run checkpoints periodically, handles SIGUSR1 five minutes before the time limit, requeues itself and resumes; PyTorch installs from a cu128 wheel in a home venv; run scripts skip finished outputs, so a failed chain restarts where it stopped.
-- Outcome: resume verified locally (a killed run matches an uninterrupted one to 1e-6) and on the cluster. Job 416139 was signalled at step 1,864, requeued under the same id, resumed from 1,864 and finished at 24,000. Three earlier attempts to demonstrate this failed for avoidable reasons of ours (a signalling script that never fired twice, and a reused run name that overwrote a smoke run's config); the docs record both.
+- Outcome: resume verified locally (a killed run matches an uninterrupted one to 1e-6) and on the cluster. Job 416139 was signalled at step 1,864, requeued under the same id, resumed from 1,864 and finished at 24,000. Three earlier attempts to demonstrate this failed for avoidable reasons on our side (a signalling script that did not fire, twice, and a reused run name that overwrote a smoke run's config); both are recorded in the results summary.
 
 ### 8. Code data is gated
 
@@ -94,30 +94,30 @@ No separate Part 1 difficulties were recorded; the team confirmed (27 Oct 2026) 
 ### 9. Entropy-model BPB fell below the planned range
 
 - Problem: the plausible range had been set at 0.9 to 1.3 (TinyStories) and 1.7 to 2.2 (WikiText); we measured 0.8438 and 1.6983.
-- Impact: a BPB that looks too good may betoken a leak, and this model also places the patch boundaries.
+- Impact: a BPB that looks too good may indicate a leak, and this model also places the patch boundaries.
 - Action: causality tests (changing later bytes never changes earlier logits, windows limit reach, documents are isolated) and a sanity bound from the BPE Transformer (0.694 and 1.520) and the 4-gram (1.81 and 2.41).
 - Outcome: no leak found; the planned range had been conservative.
 
 ### 10. Training and evaluation must see the same patches
 
 - Problem: training samples windows from the middle of documents, whereas evaluation scores whole documents from a BOS token.
-- Impact: a mismatch would make evaluation BPB differ from training loss for reasons unconnected with the model.
+- Impact: a mismatch would make evaluation BPB differ from training loss for reasons unrelated to the model.
 - Action: documents are isolated by an attention mask built from BOS positions; patch boundaries come from a cached per-byte entropy array, so training and evaluation share them; evaluation scores 4,096-byte chunks that begin exactly like training windows.
 - Outcome: consistent; the cache matches direct computation to 1e-3 (float16 storage).
 
 ### 11. An out-of-memory error silently corrupted a cache
 
-- Problem: the WikiText entropy cache crashed for lack of memory while another job occupied the GPU, but the queue carried on and the half-written array remained on disk.
+- Problem: the WikiText entropy cache crashed for lack of memory while another job occupied the GPU, but the queue continued and the half-written array remained on disk.
 - Impact: the entropy-patched WikiText model would have trained on zeros for part of its data.
 - Action: caught by reading the queue log; the cache was deleted and rebuilt, and the next queue halts if the cache script fails.
 - Outcome: repaired before use. The same limit returned later: two 16,384-byte trainings (about 45 GB each) could not share one 95 GB GPU, so those runs went one at a time.
-- Lesson: our own time estimates were also awry (a 60-step laptop test suggested 0.3 s per step, whereas real steps took 1.5 to 2.4 s). We now measure with the GPU idle; on the cluster a 3,000-step run takes about 90 seconds, which made tenfold training cheap.
+- Lesson: our time estimates were also inaccurate (a 60-step laptop test suggested 0.3 s per step, whereas real steps took 1.5 to 2.4 s). We now measure with the GPU idle; on the cluster a 3,000-step run takes about 90 seconds, which made tenfold training inexpensive.
 
 ### 12. Seed variance rivals some effects (corrected)
 
 - Problem: seed 0 of TinyStories had a full-cache BPB of 0.7980 against 0.8544 for seed 2 (seed spread 0.056; 0.135 for fixed stride).
-- Impact: the 3.3 percent gap between entropy patching and fixed stride that we first reported lay within seed noise.
-- Action: three seeds for every patching scheme in all four settings, a stride-5 control, and paired document bootstrap intervals, so that eviction comparisons on one model are unaffected by seed. The single-seed claim was retired.
+- Impact: the 3.3 percent gap between entropy patching and fixed stride that we first reported was within seed noise.
+- Action: three seeds for every patching scheme in all four settings, a stride-5 control, and paired document bootstrap intervals, so that eviction comparisons on one model are unaffected by seed. The single-seed claim was withdrawn.
 - Outcome: the eviction sign holds in every seed; patching comparisons are stated as likely, not established.
 
 ### 13. A cache size accounting error (corrected)
@@ -146,7 +146,7 @@ No separate Part 1 difficulties were recorded; the team confirmed (27 Oct 2026) 
 - Problem: the first 16,384-byte models (batch size 2) scored 1.89 BPB, worse than the 4,096-byte models, and suggested that the entropy penalty fades with context.
 - Impact: a wrong conclusion about long context.
 - Action: tuned learning rate and batch size on validation; batch 8 gave 1.5843 BPB. The tuned models also see four times more bytes, so context length and amount of training are not disentangled.
-- Outcome: with the tuned models the penalty does not fade (+0.016 to +0.021 BPB against random); the earlier statement was retired.
+- Outcome: with the tuned models the penalty does not fade (+0.016 to +0.021 BPB against random); the earlier statement was withdrawn.
 
 ### 17. Tenfold training overfits TinyStories
 
@@ -173,5 +173,5 @@ No separate Part 1 difficulties were recorded; the team confirmed (27 Oct 2026) 
 
 - Problem: keeping high-entropy patches is worse than random in 68 and than recency in 70 of 72 comparisons, in every seed, in the code-mix models, on the WikiText test split, with models trained tenfold longer (where the penalty grows), at 16,384 bytes, and for a recency-protected variant.
 - Impact: the core claim of the proposal is not supported.
-- Action: reported as measured; tried the obvious escape routes (other aggregations, the model's own entropy, sink size, a byte-level cache, more training, longer context, a protected recency window); added an attention-based rule; and wrote an error analysis showing what the entropy rule keeps (`docs/error_analysis.md`).
+- Action: reported as measured; tested the obvious alternative explanations (other aggregations, the model's own entropy, sink size, a byte-level cache, more training, longer context, a protected recency window); added an attention-based rule; and wrote an error analysis showing what the entropy rule keeps (`docs/error_analysis.md`).
 - Outcome: a reproducible negative result with a mechanism, accompanied by working compression results (SnapKV-style eviction, 4-bit quantization, bounded-memory streaming).

@@ -1,12 +1,12 @@
 # The demonstration: a script of ten to twelve minutes
 
-The demonstration employs `scripts/demo.py`, options 6, 4, 7 and 5, in that order. Every output printed below was produced on CPU (four cores, no GPU) on 27 Oct 2026 from a fresh clone, the release assets having been fetched by the demo itself. Figures will deviate slightly on another processor or PyTorch build; and the ranking of policies on a single text is an anecdote, not a result (see "On single runs", below).
+The demonstration uses `scripts/demo.py`, options 6, 4, 7 and 5, in that order. Every output printed below was produced on CPU (four cores, no GPU) on 27 Oct 2026 from a fresh clone, the release assets having been fetched by the demo itself. Figures may differ slightly on another processor or PyTorch build, and the ranking of policies on a single text is an anecdote, not a result (see "On single runs", below).
 
-## Arranging it on a desktop
+## Setup
 
 On Windows, double-click `run.bat`; on Linux or macOS, run `./run.sh`. Each launcher locates Python 3.10 or newer (installing it if absent), reuses an existing PyTorch or builds a private environment (`%LOCALAPPDATA%\kv-cache-nlp\venv` on Windows, `~/.cache/kv-cache-nlp/venv` elsewhere), installs the requirements and opens the menu. The first start needs the internet: PyTorch for CPU is about 200 MB, and the release assets are 138 MB and 124 MB. Before presenting, run `python scripts/check_demo.py`; in about five seconds it audits Python, the packages, the assets, a forward pass and the code paths of options 4 and 6, and prints `[ok]` or `[FAIL]` against each.
 
-What was verified on 27 Oct 2026 (Linux, four CPU cores, no GPU): a fresh clone whose system Python lacked PyTorch ran `run.sh`, built the private environment (about two minutes, once only) and completed option 4; options 1 to 7 all ran from the menu. What was not verified: `run.bat` on Windows and the launcher on macOS (`docs/CHALLENGES.md` records a Part 2 rehearsal from a fresh unzip that passed). Test both on the machine from which you will present. The menu now refuses cache budgets below ten patches and returns to the menu should an option fail, since a budget of nine or less formerly ended the demonstration with a traceback.
+What was verified on 27 Oct 2026 (Linux, four CPU cores, no GPU): a fresh clone whose system Python lacked PyTorch ran `run.sh`, built the private environment (about two minutes, once only) and completed option 4; options 1 to 7 all ran from the menu. What was not verified: `run.bat` on Windows and the launcher on macOS (`docs/CHALLENGES.md` records a Part 2 rehearsal from a fresh unzip that passed). Test both on the machine from which you will present. The menu refuses cache budgets below ten patches and returns to the menu if an option fails; previously a budget of nine or less ended the demonstration with a traceback.
 
 ## Before the presentation (five minutes, once)
 
@@ -95,13 +95,13 @@ keep 64 patches: entropy               0.862        589.8 KB      8.7
 
 With `wikitext103`: 940 patches, full 1.722 (8653.8 KB), recency 1.729, random 1.738, entropy 1.756 (all 589.8 KB), about eight seconds per policy.
 
-Say: the cache is truly bounded (590 KB against 9 MB at 4,000 bytes, and the disparity widens with length: `results/part3/deploy_bench.md` measured 136.5 MB against 0.59 MB at 65,536 bytes on a GPU). On TinyStories recency beats the full cache; we suspect that this is because the demo text joins unrelated stories, whose older members are mere noise, but we have not tested the suspicion. The report's version of the finding is in `results/part3/stream_16k.md` and `results/part3/pg19_stream.md`.
+Say: the cache is truly bounded (590 KB against 9 MB at 4,000 bytes, and the difference grows with length: `results/part3/deploy_bench.md` measured 136.5 MB against 0.59 MB at 65,536 bytes on a GPU). On TinyStories recency beats the full cache; a likely explanation is that the demo text joins unrelated stories, so that the older ones act as noise; this was not tested. The report's version of the finding is in `results/part3/stream_16k.md` and `results/part3/pg19_stream.md`.
 
 ## Option 5: the results (a few seconds to print, 250 lines)
 
 Input: `5`. It prints `docs/results_summary.md`; scroll to the top.
 
-Show, in this order: the gate table (the BLT does not beat the BPE Transformer at equal training); the eviction table (keeping high entropy is worst); the tenfold-training table (the penalty grows from +0.002 to +0.029); the combination table (7.4 percent of the cache for +0.0012 BPB); the PG-19 table. If the printout proves unwieldy, open `docs/results_summary.md` instead.
+Show, in this order: the gate table (the BLT does not beat the BPE Transformer at equal training); the eviction table (keeping high entropy is worst); the tenfold-training table (the penalty grows from +0.002 to +0.029); the combination table (7.4 percent of the cache for +0.0012 BPB); the PG-19 table. If the printout is hard to follow, open `docs/results_summary.md` instead.
 
 ## On single runs
 
@@ -109,7 +109,7 @@ An examiner may point to a line where entropy beats random (it does in option 7 
 
 ## The record of testing, and of failure
 
-From a fresh clone (`git clone`, then `python scripts/demo.py` fed by stdin), options 1 to 7 completed without error and without altering the repository; the launcher `run.sh` also completed on a machine whose Python lacked PyTorch. No failure remained after the fix to cache-budget validation. Untested: Windows (`run.bat`), macOS, and a GPU. Observed frictions, which are not failures: the first run needs about 262 MB of downloads; and option 7 slows by more than an order of magnitude when another CPU-bound process shares the cores.
+From a fresh clone (`git clone`, then `python scripts/demo.py` fed by stdin), options 1 to 7 completed without error and without altering the repository; the launcher `run.sh` also completed on a machine whose Python lacked PyTorch. No failure remained after the fix to cache-budget validation. Untested: Windows (`run.bat`), macOS, and a GPU. Observed limitations, which are not failures: the first run needs about 262 MB of downloads, and option 7 runs more than ten times slower when another CPU-bound process shares the cores.
 
 A rehearsal without typing (CPU, about two minutes, three options in one breath):
 

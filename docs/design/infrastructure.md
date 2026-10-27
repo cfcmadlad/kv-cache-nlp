@@ -14,9 +14,9 @@
 
 ## How resume works
 
-Every `ckpt_every` steps the trainer writes `runs/<id>/ckpt.pt` through a temporary file and an atomic rename, so that a kill in mid-write cannot corrupt it. The checkpoint holds the model, the optimizer, the step and the random state. Batches are a pure function of (seed, step), and a resumed run therefore beholds exactly the data that an uninterrupted one would have seen.
+Every `ckpt_every` steps the trainer writes `runs/<id>/ckpt.pt` through a temporary file and an atomic rename, so that a kill during a write cannot corrupt it. The checkpoint holds the model, the optimizer, the step and the random state. Batches are a pure function of (seed, step), and a resumed run therefore sees exactly the data that an uninterrupted run would have seen.
 
-On the cluster, SLURM sends SIGUSR1 to the batch script five minutes before the time limit. The script forwards the signal to Python, which saves a checkpoint, writes a `PREEMPTED` marker and withdraws; the script then calls `scontrol requeue`, and the requeued job, running the same command, resumes where its predecessor left off. `--requeue` covers node failures as well, at a loss of no more than `ckpt_every` steps.
+On the cluster, SLURM sends SIGUSR1 to the batch script five minutes before the time limit. The script forwards the signal to Python, which saves a checkpoint, writes a `PREEMPTED` marker and exits; the script then calls `scontrol requeue`, and the requeued job, running the same command, resumes where its predecessor left off. `--requeue` covers node failures as well, at a loss of no more than `ckpt_every` steps.
 
 ## Run
 
@@ -33,4 +33,4 @@ sbatch --test-only slurm/train.sbatch scripts/train_smoke.py configs/ops/smoke.j
 sbatch slurm/train.sbatch scripts/train_smoke.py configs/ops/smoke.json
 ```
 
-Set `RUN_ID=name` before `sbatch` to choose the run directory; by default it bears the name of the config file.
+Set `RUN_ID=name` before `sbatch` to choose the run directory; by default it is the name of the config file.
