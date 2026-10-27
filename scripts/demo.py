@@ -128,6 +128,44 @@ def compress_cache():
         print(f"{name:<36}{bpb:>8.3f}{size / 1000:>13.1f} KB")
 
 
+def train_part3():
+    from demo_part3 import evaluate_live, train_live
+    dataset = ask("Dataset", ["tinystories", "wikitext103"])
+    steps = int(read_line("Training steps (default 300): ") or 300)
+    budget = int(read_line("Cache budget in patches for the comparison (default 16): ") or 16)
+    device = "cuda" if torch.cuda.is_available() else "cpu"
+    count = 1500 if dataset == "tinystories" else 60
+    texts = read_jsonl_texts(REPO_ROOT / "data" / "processed" / dataset / "train.jsonl", count)
+    held_out = read_jsonl_texts(REPO_ROOT / "data" / "processed" / dataset / "val.jsonl", 20)
+    print(f"\nTraining a small byte-level model live on {dataset} ({device}). Patches are fixed 4-byte strides here.\n")
+    model = train_live(texts, steps, device)
+    print(f"\nScoring {len(held_out)} validation documents (first 1,500 bytes each) with a cache of {budget} patches.\n")
+    print(f"{'Cache setting':<36}{'BPB':>8}{'Mean KV cache':>16}")
+    for name, bpb, size in evaluate_live(model, held_out, budget, device):
+        print(f"{name:<36}{bpb:>8.3f}{size / 1000:>13.1f} KB")
+    print("\nA model this small and this briefly trained barely uses its global cache, so the policies differ little. Options 4 and 7 use the fully trained models.")
+
+
+def stream_cache():
+    if not ensure_part3_assets():
+        return
+    from cache_demo import load_pair
+    from demo_part3 import stream_compare
+    dataset = ask("Dataset", ["tinystories", "wikitext103"])
+    device = "cuda" if torch.cuda.is_available() else "cpu"
+    model, entropy, cfg = load_pair(dataset, device)
+    samples = read_jsonl_texts(REPO_ROOT / "data" / "processed" / dataset / "val.jsonl", 40)
+    print("\nType or paste text, or press Enter to use validation text.\n")
+    text = read_line("> ") or " ".join(samples)
+    max_bytes = int(read_line("Bytes to decode one at a time (default 4000): ") or 4000)
+    budget = int(read_line("Global cache budget in patches (default 64): ") or 64)
+    result = stream_compare(text, model, entropy, cfg, budget, device, max_bytes)
+    print(f"\n{result['bytes']} bytes in {result['patches']} patches, decoded one byte at a time with real cache eviction.\n")
+    print(f"{'Cache setting':<36}{'BPB':>8}{'Final KV cache':>16}{'Seconds':>10}")
+    for name, bpb, size, seconds in result["rows"]:
+        print(f"{name:<36}{bpb:>8.3f}{size / 1000:>13.1f} KB{seconds:>9.1f}")
+
+
 def show_part3_results():
     path = REPO_ROOT / "docs" / "results_summary.md"
     safe_print(path.read_text(encoding="utf-8") if path.exists() else "docs/results_summary.md is missing.")
@@ -136,14 +174,15 @@ def show_part3_results():
 def main():
     if not ensure_assets():
         sys.exit("\nCould not get the trained models and data; see the message above.")
-    actions = {"1": train_live, "2": lambda: run(["scripts/bpb_harness.py"]), "3": explore_model, "4": compress_cache, "5": show_part3_results}
+    actions = {"1": train_live, "2": lambda: run(["scripts/bpb_harness.py"]), "3": explore_model, "4": compress_cache, "5": show_part3_results, "6": train_part3, "7": stream_cache}
     while True:
         print("\n=== kv-cache-nlp demo ===\n1) Train a model live\n2) Baseline comparison table\n"
-              "3) Score and continue your text\n4) Compress the KV cache of a text (Part 3)\n5) Part 3 results\n6) Quit")
+              "3) Score and continue your text\n4) Compress the KV cache of a text (Part 3)\n5) Part 3 results\n"
+              "6) Train a small byte-level model live (Part 3)\n7) Stream a long text with a fixed cache (Part 3)\n8) Quit")
         choice = read_line("> ")
-        if choice == "6":
+        if choice == "8":
             return
-        actions.get(choice, lambda: print("  Please enter a number from 1 to 6."))()
+        actions.get(choice, lambda: print("  Please enter a number from 1 to 8."))()
 
 
 if __name__ == "__main__":

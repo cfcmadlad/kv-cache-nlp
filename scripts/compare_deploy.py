@@ -243,6 +243,33 @@ def ablation_seed_table(resamples: int, seed: int) -> str:
     return "\n".join(lines)
 
 
+def pg19_table(resamples: int, seed: int) -> str:
+    lines = ["Long books (PG-19 test split, `emozilla/pg19` mirror; the first 100,000 bytes of each of the first 20 books) decoded one byte at a time with a real fixed-size cache; patch positions grow to about 22,000, "
+             "two orders of magnitude beyond the 4,096-byte training chunks. `reset4096` resets the context every 4,096 bytes with a full cache inside each chunk; `full` keeps every patch for the whole book. "
+             f"Models are WikiText code-mix models, so PG-19 (pre-1919 English) is out of domain. 95% book bootstrap intervals ({resamples} resamples). Differences are the first minus the second (negative means the first is better).", ""]
+    for run in ("blt_wikitext103mix_entropy_x10", "blt_wikitext103mix_entropy"):
+        parts = sorted((REPO_ROOT / "runs" / run).glob("stream_pg19_*.json"), key=lambda p: int(p.stem.split("_")[2]))
+        if not parts:
+            continue
+        rs = [json.loads(p.read_text(encoding="utf-8")) for p in parts]
+        nbytes = np.concatenate([np.asarray(r["bytes_per_doc"], dtype=float) for r in rs])
+        v = {k: np.concatenate([np.asarray(r["variants"][k]["nats"]) for r in rs]) for k in rs[0]["variants"]}
+        idx = bootstrap_indices(len(nbytes), resamples, seed)
+        base = next(k for k in v if k.startswith("reset"))
+        lo, hi = bootstrap_ci(v["full|0"], nbytes, idx)
+        lines += [f"## {run} ({len(nbytes)} books, {int(nbytes.sum()):,} bytes)", "", f"{base[:-2]} full cache within chunks: {bpb(v[base], nbytes):.4f}; whole-book full cache: {bpb(v['full|0'], nbytes):.4f} [{lo:.4f}, {hi:.4f}].", "",
+                  "| Budget | Policy | BPB | Policy - reset | Policy - recency |", "|---|---|---|---|---|"]
+        for k in v:
+            if k in ("full|0", base):
+                continue
+            mode, b = k.split("|")
+            d = fmt(*paired_diff_ci(v[k], v[base], nbytes, idx))
+            r = "" if mode == "recency" else fmt(*paired_diff_ci(v[k], v[f"recency|{b}"], nbytes, idx))
+            lines.append(f"| {b} | {mode} | {bpb(v[k], nbytes):.4f} | {d} | {r} |")
+        lines.append("")
+    return "\n".join(lines)
+
+
 def memory_table(resamples: int, seed: int) -> str:
     per = lambda bits, layers=6, dim=384, heads=6: entry_bytes(layers, dim, heads, bits)
     bytes_per_patch, bytes_per_token = 4.5, 4.0
@@ -260,7 +287,7 @@ def memory_table(resamples: int, seed: int) -> str:
 
 
 TABLES = {"online": online_table, "hybrid": hybrid_table, "combo": combo_table, "stream": stream_table, "needle": needle_table, "bench": bench_table,
-          "scale": scale_table, "ablseeds": ablation_seed_table, "memory": memory_table}
+          "scale": scale_table, "pg19": pg19_table, "ablseeds": ablation_seed_table, "memory": memory_table}
 
 
 def main():

@@ -56,7 +56,7 @@ For WikiText-103 the reported runs used `--max-train-docs 4500 --eval-max-docs 6
 
 ## Data
 
-TinyStories (30,000 train stories, 21,990 validation) and WikiText-103 (articles rebuilt from the raw line export, placeholder tokens such as `@-@` restored), Unicode NFC normalised, exact duplicates removed. Part 3 adds The Stack Smol for code. Long contexts use the long WikiText-103 documents (PG-19 from the proposal was not used).
+TinyStories (30,000 train stories, 21,990 validation) and WikiText-103 (articles rebuilt from the raw line export, placeholder tokens such as `@-@` restored), Unicode NFC normalised, exact duplicates removed. Part 3 adds The Stack Smol for code and PG-19 (the `emozilla/pg19` mirror of the test split, 100 books) for long-book streaming; long contexts otherwise use the long WikiText-103 documents.
 
 ## Part 3
 
@@ -74,7 +74,7 @@ python scripts/results.py --phase 2
 python -m pytest
 ```
 
-Demo on a CPU laptop (option 4 of `scripts/demo.py` runs the policies and quantization on any text): `python scripts/fetch_assets.py`, then `run.bat` or `./run.sh`. Option 4 fetches the Part 3 models (124 MB, SHA-256 checked) from the `v0.3-part3` release on first use with `scripts/part3_assets.py fetch`; `scripts/part3_assets.py build` rebuilds the zip.
+Demo on a CPU laptop (option 4 of `scripts/demo.py` runs the policies and quantization on any text; option 6 trains a small byte-level model live in about two minutes and compares cache policies; option 7 decodes a long text one byte at a time with a real fixed-size cache and prints BPB, final cache size and time): `python scripts/fetch_assets.py`, then `run.bat` or `./run.sh`. Option 4 fetches the Part 3 models (124 MB, SHA-256 checked) from the `v0.3-part3` release on first use with `scripts/part3_assets.py fetch`; `scripts/part3_assets.py build` rebuilds the zip.
 
 Seeds, control and ablations (run on the cluster with `sbatch slurm/job.sbatch bash scripts/<name>.sh`; each resumes finished runs):
 
@@ -98,7 +98,7 @@ python scripts/compare.py long --out results/part3/long_context.md
 python scripts/compare.py test --out results/part3/test_split.md
 ```
 
-Deployment-oriented runs (`run_deploy.sh`: measured decoding, eviction plus quantization, recency-protected entropy, planted-name recall; `run_online.sh`: online H2O and SnapKV; `run_ablations_seeds.sh`; `run_scale.sh` and `run_scale2.sh`: 30,000-step models and 16k tuning; `run_stream.sh`: bounded-memory streaming):
+Deployment-oriented runs (`run_deploy.sh`: measured decoding, eviction plus quantization, recency-protected entropy, planted-name recall; `run_online.sh`: online H2O and SnapKV; `run_ablations_seeds.sh`; `run_scale.sh` and `run_scale2.sh`: 30,000-step models and 16k tuning; `run_stream.sh`: bounded-memory streaming; `run_pg19.sh`: PG-19 download, entropy cache and byte-by-byte streaming on long books):
 
 ```bash
 python scripts/compare_deploy.py online --out results/part3/online_policies.md
@@ -110,8 +110,9 @@ python scripts/compare_deploy.py needle --out results/part3/deploy_needle.md
 python scripts/compare_deploy.py ablseeds --out results/part3/ablations_seeds.md
 python scripts/compare_deploy.py scale --out results/part3/scale_and_tuning.md
 python scripts/compare_deploy.py memory --out results/part3/deploy_memory.md
+python scripts/compare_deploy.py pg19 --out results/part3/pg19_stream.md
 ```
 
 All experiments are done; tables are in `results/part3/` and the report draft is `docs/report_part3.md`. Details in `PLAN.md`.
 
-Plan in `PLAN.md`, related work in `NOVELTY.md`, per-block notes and results in `docs/`.
+Plan in `PLAN.md`, related work in `NOVELTY.md`, problems and fixes in `CHALLENGES.md`, per-block notes and results in `docs/`.

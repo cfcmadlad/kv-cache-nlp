@@ -214,6 +214,23 @@ The budget is split: the newest half is protected, and the other half goes to hi
 
 A random four-syllable name is introduced early and repeated after 400, 1,200 or 3,000 filler bytes; the score is the BPB of the name after its first two letters, 40 trials per distance. The models do not use the earlier mention: with a full cache the score equals the no-cue control (for example TinyStories seed 0 at 400 bytes: 9.24 bits per byte against 9.27 for the control), so no policy can be shown to help and nothing about retrieval can be concluded at this scale. The entropy rule does keep the planted name's patches more often than random does (45 percent against 31 percent at 64 patches and a distance of 400 bytes, 18 against 11 percent at 1,200), but the model gains nothing from them.
 
+## Long books: PG-19 (`python scripts/compare_deploy.py pg19`, `results/part3/pg19_stream.md`)
+
+The proposal named PG-19 for long-context cache evaluation. The first 100,000 bytes of each of the first 20 test books (`emozilla/pg19`, a community mirror of the same split, because `deepmind/pg19` ships as a loading script that current `datasets` no longer runs; 100 books, 40.5 MB, split and hash checks pass) were decoded one byte at a time with `BLT.step` and a real fixed-size cache (`scripts/eval_stream.py`, `scripts/run_pg19.sh`, `runs/<model>/stream_pg19_*.json`). Patch positions reach about 22,000, against roughly 900 in the 4,096-byte training chunks. The models are the WikiText code-mix models, so these pre-1919 books are out of domain and BPB is high; 95 percent intervals are bootstrapped over the 20 books and every comparison is paired.
+
+| Setting (BPB) | 30,000-step model | 3,000-step model |
+|---|---|---|
+| Full cache, context reset every 4,096 bytes | 2.2097 | 2.5566 |
+| Full cache for the whole book | 2.3467 | 2.5763 |
+| Recency, 64 / 128 / 256 patches | 2.2265 / 2.2107 / 2.2012 | 2.5538 / 2.5522 / 2.5512 |
+| Random, 64 / 128 / 256 patches | 2.3069 / 2.2870 / 2.2692 | 2.5578 / 2.5566 / 2.5567 |
+| Keep high entropy, 64 / 128 / 256 patches | 2.3193 / 2.3160 / 2.3227 | 2.5789 / 2.5788 / 2.5795 |
+
+- Recency is the only policy that is safe on long books. For the 30,000-step model, 256 patches beat the reset baseline by 0.0086 BPB [0.0079, 0.0093] and the whole-book full cache by 0.145; 128 patches tie the reset baseline (+0.0009) and 64 are 0.0168 worse. For the 3,000-step model recency beats the reset baseline at all three budgets, by 0.0028 to 0.0054.
+- The whole-book full cache is worse than resetting the context for both models (+0.137 and +0.020 BPB), so the model does not use a context 24 times longer than it was trained on; a bounded recency cache avoids that.
+- Keeping high-entropy patches is the worst policy at every budget: +0.093 to +0.122 against recency for the 30,000-step model and +0.025 to +0.028 for the 3,000-step model, all intervals above zero. Random patches are also worse than recency (+0.068 to +0.081 and +0.004 to +0.006).
+- Caveat: keeping old patches (random or entropy) means attending across distances far beyond the training range, so this experiment cannot separate "entropy is a poor keep signal" from "old patches are hard for this model at these positions". The remedy of renumbering positions inside the cache (as StreamingLLM does) was not tried. SnapKV-style and H2O were not run on PG-19 because `BLT.step` has no attention policies.
+
 ## Requeue test (Block 2.0)
 
 Verified on the cluster under a single job id. Job 416139 (`configs/requeue_cluster4.json`, 24,000 steps) was sent SIGUSR1 with `scancel --signal=USR1 --batch` while running. It saved a checkpoint at step 1,864, wrote the PREEMPTED marker and was requeued by the batch script (restart count 1). SLURM held it for its restart delay (about 10 minutes), then restarted the same job id; the log printed "resumed at step 1864" and training ran to step 24,000 (final loss 0.1845), with `meta.json` recording both attempts (`ended_step` 1864, then `resumed_from_step` 1864 and `ended_step` 24000, status done). Earlier smoke jobs (407961 and 408216, 7-minute limit) showed the same path across two job ids. Two attempts to repeat the single-id test were not signalled because my signalling script failed (jobs 415084 and 416117 ran straight through), and one earlier attempt reused the old run name `requeue_test`, which overwrote that smoke run's `config.json` (its log and checkpoint were kept; the smoke config is `configs/smoke.json`). The first smoke attempt recorded ending at step 1; I did not find out why. The local test (resume equals uninterrupted) covers equality of the resumed run.
