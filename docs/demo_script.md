@@ -1,38 +1,38 @@
-# Viva demo script (10 to 12 minutes)
+# The demonstration: a script of ten to twelve minutes
 
-Uses `scripts/demo.py` options 6, 4, 7 and 5. All outputs below were produced on CPU (4 cores, no GPU) on 27 Oct 2026 from a fresh clone of commit 84f9b5d, with the release assets downloaded by the demo itself. Numbers will differ slightly on another CPU or PyTorch build; the ranking of policies on a single text is an anecdote, not the result (see "What to say about single runs").
+The demonstration employs `scripts/demo.py`, options 6, 4, 7 and 5, in that order. Every output printed below was produced on CPU (four cores, no GPU) on 27 Oct 2026 from a fresh clone, the release assets having been fetched by the demo itself. Figures will deviate slightly on another processor or PyTorch build; and the ranking of policies on a single text is an anecdote, not a result (see "On single runs", below).
 
-## Running it on a desktop
+## Arranging it on a desktop
 
-Windows: double-click `run.bat`. Linux or macOS: `./run.sh`. Both find Python 3.10 or newer (installing it if missing), reuse an existing PyTorch or build a private environment in `%LOCALAPPDATA%\kv-cache-nlp\venv` (`~/.cache/kv-cache-nlp/venv`), install the requirements and start the menu. The first start needs internet (PyTorch about 200 MB for CPU, plus 138 MB and 124 MB of release assets). Before the viva run `python scripts/check_demo.py`: it checks Python, packages, assets, a forward pass and the option 4 and option 6 code paths in about 5 seconds and prints `[ok]` or `[FAIL]` per item.
+On Windows, double-click `run.bat`; on Linux or macOS, run `./run.sh`. Each launcher locates Python 3.10 or newer (installing it if absent), reuses an existing PyTorch or builds a private environment (`%LOCALAPPDATA%\kv-cache-nlp\venv` on Windows, `~/.cache/kv-cache-nlp/venv` elsewhere), installs the requirements and opens the menu. The first start needs the internet: PyTorch for CPU is about 200 MB, and the release assets are 138 MB and 124 MB. Before the viva, run `python scripts/check_demo.py`; in about five seconds it audits Python, the packages, the assets, a forward pass and the code paths of options 4 and 6, and prints `[ok]` or `[FAIL]` against each.
 
-Verified on 27 Oct 2026 (Linux, 4 CPU cores, no GPU): a fresh clone with no PyTorch in the system Python ran `run.sh`, built the private environment (about 2 minutes, first time only) and completed option 4; options 1, 2, 3, 4, 5, 6 and 7 all ran from the menu. Not verified by me: `run.bat` on Windows and the launcher on macOS (`CHALLENGES.md` records a Part 2 rehearsal from a fresh unzip that passed). Test both on the machine you will present from. The menu now rejects cache budgets below 10 patches and returns to the menu if an option fails, because a budget of 9 or less used to stop the demo with a traceback.
+What was verified on 27 Oct 2026 (Linux, four CPU cores, no GPU): a fresh clone whose system Python lacked PyTorch ran `run.sh`, built the private environment (about two minutes, once only) and completed option 4; options 1 to 7 all ran from the menu. What was not verified: `run.bat` on Windows and the launcher on macOS (`CHALLENGES.md` records a Part 2 rehearsal from a fresh unzip that passed). Test both on the machine from which you will present. The menu now refuses cache budgets below ten patches and returns to the menu should an option fail, since a budget of nine or less formerly ended the demonstration with a traceback.
 
-## Before the viva (5 minutes, once)
+## Before the viva (five minutes, once)
 
-1. `pip install torch --index-url https://download.pytorch.org/whl/cpu` and `pip install -r requirements.txt` (or run `run.bat` / `./run.sh`, which set Python up). The demo itself does not install packages.
-2. `python scripts/demo.py`, enter `8`. The first run downloads the Part 2 assets (138 MB) and, on the first use of option 4 or 7, the Part 3 models (124 MB). No internet on the day: place `kv-cache-nlp-part2-assets.zip` and `kv-cache-nlp-part3-assets.zip` in the repo folder, its parent or `~/Downloads`; the demo looks there first.
-3. Close other heavy programs. With another CPU-heavy job running, option 7 took more than 10 minutes instead of 36 seconds in our test (thread contention on 4 cores).
-4. Have `docs/results_summary.md` and `report/main.pdf` open in another window.
+1. `pip install torch --index-url https://download.pytorch.org/whl/cpu` and `pip install -r requirements.txt`, or simply run `run.bat` or `./run.sh`, which attend to Python. The demo itself installs no packages.
+2. `python scripts/demo.py`, then enter `8`. The first run fetches the Part 2 assets (138 MB) and, on first use of option 4 or 7, the Part 3 models (124 MB). With no connection on the day, place `kv-cache-nlp-part2-assets.zip` and `kv-cache-nlp-part3-assets.zip` in the repository folder, its parent or `~/Downloads`; the demo looks there first.
+3. Close every other heavy program. With a competing CPU-bound job, option 7 took more than ten minutes instead of 36 seconds (thread contention on four cores).
+4. Keep `docs/results_summary.md` and `report/main.pdf` open in another window.
 
-## Timeline
+## The order of proceedings
 
 | Time | Step | What you do |
 |---|---|---|
-| 0:00 to 1:00 | Framing | Problem (byte models need about 4 times more KV cache), idea (keep high-entropy patches), outcome (negative; attention and quantization work). |
-| 1:00 to 3:30 | Option 6, live training | Start it first, talk while it trains. |
-| 3:30 to 6:00 | Option 4, compress a text | Paste a sentence chosen by the examiner. |
+| 0:00 to 1:00 | Framing | The problem (byte models need about four times the KV cache), the idea (keep high-entropy patches), the outcome (negative; attention and quantization succeed). |
+| 1:00 to 3:30 | Option 6, live training | Start it first and talk while it trains. |
+| 3:30 to 6:00 | Option 4, compress a text | Paste a sentence of the examiner's choosing. |
 | 6:00 to 8:00 | Option 7, stream with real eviction | Memory and time on a 4,000-byte text. |
 | 8:00 to 10:00 | Option 5, results | Scroll to the headline tables. |
 | 10:00 to 12:00 | Questions | `docs/viva_notes.md`, `docs/error_analysis_part3.md`. |
 
-## Option 6: train a small byte-level model live (about 80 seconds on 4 cores)
+## Option 6: a small byte-level model, trained before their eyes (about 80 seconds on four cores)
 
 Input: `6`, `tinystories`, `300`, `16`.
 
-Say: a 1.84M-parameter byte-level model with fixed 4-byte patches, trained from scratch on 1.3 MB of stories; the loss falls from 8 bits per byte (random guess) as it learns.
+Say: a 1.84M-parameter byte-level model with fixed four-byte patches, trained from nothing on 1.3 MB of stories; the loss descends from 8 bits per byte (a blind guess) as it learns.
 
-Expected (the loss values were identical in two runs, so seeding works):
+Expected (the loss values were identical in two runs, so the seeding holds):
 
 ```
 1.84M parameters, 1,302,911 training bytes, 300 steps of 16 x 512 bytes
@@ -48,11 +48,11 @@ keep 16 patches: random                2.148         35.2 KB
 keep 16 patches: entropy               2.147         35.2 KB
 ```
 
-Say: the policies are indistinguishable here, and the demo prints why: a model this small and this briefly trained barely uses its global cache. This is the honest result of a 2-minute model. The fully trained models in options 4 and 7 are the evidence.
+Say: the policies are indistinguishable here, and the demo itself says why: a model so small and so briefly trained scarcely consults its global cache. That is the honest yield of a two-minute model; the fully trained models of options 4 and 7 are the evidence.
 
-Fallbacks: if the machine is slow, enter `150` steps (about 40 seconds). If it fails, skip to option 4 and say option 6 was verified on a fresh clone (this file).
+Fallbacks: on a sluggish machine enter `150` steps (about 40 seconds). Should it fail outright, pass to option 4 and mention that option 6 was verified on a fresh clone (this file).
 
-## Option 4: compress the KV cache of a text (2 to 5 seconds)
+## Option 4: compressing the KV cache of a text (two to five seconds)
 
 Input: `4`, `tinystories`, then paste a sentence (or press Enter for a validation story), then `32`.
 
@@ -73,15 +73,15 @@ uniform 3-bit                          0.744        279.9 KB
 
 With `wikitext103`, Enter, `64` (4,096 bytes, 927 patches, 4.4 bytes per patch): full 1.576 (4276.2 KB), recency 1.580, random 1.582, entropy 1.588, entropy_inv 1.586 (all 569.8 KB), uniform 4-bit 1.577 (1135.9 KB), uniform 3-bit 1.580 (868.6 KB).
 
-Say: boundaries fall before surprising letters (`c|limb`, `R|o|xy`), which is how entropy patching works. Uniform 4-bit costs 0.001 BPB at 27 percent of the bytes; eviction to 32 patches costs 0.01 at 20 percent. Keeping high-entropy patches (`entropy`) is the worst eviction rule, as in the paper. Point to `docs/error_analysis_part3.md`: the entropy rule keeps one-byte fragments.
+Say: the boundaries fall before surprising letters (`c|limb`, `R|o|xy`), which is how entropy patching works. Uniform 4-bit costs 0.001 BPB at 27 percent of the bytes; eviction to 32 patches costs 0.01 at 20 percent. Keeping high-entropy patches (`entropy`) is the worst eviction rule, as in the paper. Point to `docs/error_analysis_part3.md`: the entropy rule hoards one-byte fragments.
 
-Caution on very short texts: a pasted 94-byte sentence (30 patches, budget 16) gave full 1.276, recency 1.280, random 1.274, entropy 1.268, entropy_inv 1.269. Differences of 0.01 BPB on one short text are noise; do not read a policy ranking from them.
+A caution on very short texts: a pasted sentence of 94 bytes (30 patches, budget 16) gave full 1.276, recency 1.280, random 1.274, entropy 1.268, entropy_inv 1.269. Differences of 0.01 BPB on one brief text are noise; read no ranking into them.
 
-## Option 7: stream a long text with a real fixed-size cache (about 36 seconds)
+## Option 7: a long text with a genuinely bounded cache (about 36 seconds)
 
 Input: `7`, `tinystories`, Enter, `4000`, `64`.
 
-Expected (default text is 40 validation stories joined by spaces, 978 patches):
+Expected (the default text is 40 validation stories joined by spaces, 978 patches):
 
 ```
 4000 bytes in 978 patches, decoded one byte at a time with real cache eviction.
@@ -93,25 +93,25 @@ keep 64 patches: random                0.870        589.8 KB      8.9
 keep 64 patches: entropy               0.862        589.8 KB      8.7
 ```
 
-With `wikitext103`: 940 patches, full 1.722 (8653.8 KB), recency 1.729, random 1.738, entropy 1.756 (all 589.8 KB), about 8 seconds per policy.
+With `wikitext103`: 940 patches, full 1.722 (8653.8 KB), recency 1.729, random 1.738, entropy 1.756 (all 589.8 KB), about eight seconds per policy.
 
-Say: the cache is really bounded (590 KB against 9 MB at 4,000 bytes, and the gap grows with length: `results/part3/deploy_bench.md` measured 136.5 MB against 0.59 MB at 65,536 bytes on a GPU). On TinyStories recency is better than the full cache. We think this is because the demo text joins unrelated stories so old stories are noise; we have not tested that. The paper's version of this finding is in `results/part3/stream_16k.md` and `results/part3/pg19_stream.md`.
+Say: the cache is truly bounded (590 KB against 9 MB at 4,000 bytes, and the disparity widens with length: `results/part3/deploy_bench.md` measured 136.5 MB against 0.59 MB at 65,536 bytes on a GPU). On TinyStories recency beats the full cache; we suspect that this is because the demo text joins unrelated stories, whose older members are mere noise, but we have not tested the suspicion. The report's version of the finding is in `results/part3/stream_16k.md` and `results/part3/pg19_stream.md`.
 
-## Option 5: results (print takes a few seconds, 250 lines)
+## Option 5: the results (a few seconds to print, 250 lines)
 
 Input: `5`. It prints `docs/results_summary.md`; scroll to the top.
 
-Show, in this order: the gate table (BLT does not beat the BPE Transformer at equal training); the eviction table (keeping high entropy is worst); the 10x-training table (penalty grows from +0.002 to +0.029); the combination table (7.4 percent of the cache for +0.0012 BPB); the PG-19 table. If the printout is too long, open `docs/results_summary.md` instead.
+Show, in this order: the gate table (the BLT does not beat the BPE Transformer at equal training); the eviction table (keeping high entropy is worst); the tenfold-training table (the penalty grows from +0.002 to +0.029); the combination table (7.4 percent of the cache for +0.0012 BPB); the PG-19 table. If the printout proves unwieldy, open `docs/results_summary.md` instead.
 
-## What to say about single runs
+## On single runs
 
-Examiners may point at a line where entropy beats random (it does in option 7 on TinyStories: 0.862 against 0.870). Answer: one text of 4,000 bytes is an anecdote. The evidence is 72 paired comparisons over three seeds, four settings and two budgets, where keeping high entropy is worse than random in 68 and better in none (`results/part3/seeds.md`), plus the error analysis (`docs/error_analysis_part3.md`).
+An examiner may point to a line where entropy beats random (it does in option 7 on TinyStories: 0.862 against 0.870). Answer: one text of 4,000 bytes is an anecdote. The evidence is 72 paired comparisons over three seeds, four settings and two budgets, in which keeping high entropy is worse than random in 68 and better in none (`results/part3/seeds.md`), together with the error analysis (`docs/error_analysis_part3.md`).
 
-## Test record and failures
+## The record of testing, and of failure
 
-Run from a fresh clone (`git clone`, then `python scripts/demo.py` with stdin choices): options 4, 6 and 7 completed with no error and no change to the repository. No failure was found. What was not tested: Windows (`run.bat`), a machine without Python or PyTorch, and a GPU. Observed issues, not failures: the first run needs about 262 MB of downloads; the demo needs `torch`, `numpy`, `tokenizers` and `tqdm` installed beforehand; option 7 slows by more than an order of magnitude when another CPU-heavy process shares the cores.
+From a fresh clone (`git clone`, then `python scripts/demo.py` fed by stdin), options 1 to 7 completed without error and without altering the repository; the launcher `run.sh` also completed on a machine whose Python lacked PyTorch. No failure remained after the fix to cache-budget validation. Untested: Windows (`run.bat`), macOS, and a GPU. Observed frictions, which are not failures: the first run needs about 262 MB of downloads; and option 7 slows by more than an order of magnitude when another CPU-bound process shares the cores.
 
-Rehearsal without typing (CPU, about 2 minutes in total, three options in one go):
+A rehearsal without typing (CPU, about two minutes, three options in one breath):
 
 ```bash
 printf '4\ntinystories\n\n32\n6\ntinystories\n300\n16\n7\ntinystories\n\n4000\n64\n8\n' | python scripts/demo.py

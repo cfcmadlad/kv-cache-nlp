@@ -1,31 +1,62 @@
-data/processed/
+# Python
+__pycache__/
+*.py[cod]
+*.egg-info/
+.pytest_cache/
+.ipynb_checkpoints/
+
+# Environments and credentials
+.venv/
+venv/
+env/
+.env
+.env.*
+*.pem
+*.key
+
+# Large or regenerable artefacts (fetch with scripts/fetch_assets.py and scripts/part3_assets.py)
 checkpoints/
+data/processed/
+data/bytes/
+runs/
+*.zip
 results/*
 !results/part3/
 !results/phase2.md
-__pycache__/
-*.pyc
-.venv/
-venv/
-.ipynb_checkpoints/
-report_kit/
-*.pdf
-*.zip
-runs/
-.pytest_cache/
+
+# Scheduler output
 slurm/logs/*
 !slurm/logs/.gitkeep
-data/bytes/
-!report/main.pdf
-!report/figures/*.pdf
+
+# LaTeX build products
 report/*.aux
 report/*.bbl
 report/*.blg
+report/*.fdb_latexmk
+report/*.fls
 report/*.log
+report/*.nav
 report/*.out
+report/*.snm
+report/*.synctex.gz
 report/*.toc
+report/*.vrb
+
+# PDFs are ignored except the three built documents and their figures
+*.pdf
+!report/main.pdf
 !report/supplement.pdf
 !report/slides.pdf
-report/*.nav
-report/*.snm
-report/*.vrb
+!report/figures/*.pdf
+
+# Editors, operating systems, agent scratch space
+.DS_Store
+Thumbs.db
+desktop.ini
+.vscode/
+.idea/
+*.swp
+*~
+.claude/
+node_modules/
+report_kit/

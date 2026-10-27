@@ -1,6 +1,6 @@
-# Error analysis: what cache eviction does to the text
+# Anatomy of an eviction: what a bounded cache does to the text
 
-The Part 1 proposal promised a qualitative look at where eviction hurts. Everything below comes from `results/part3/error_analysis.md`, written by `python scripts/error_analysis_part3.py` (CPU, about 2 minutes) from the seed-0 entropy-patched models of the `v0.3-part3` release and the validation documents. Setup: TinyStories 100 documents (74,760 bytes) at a budget of 32 patches; WikiText-103 30 documents (122,880 bytes, each cut to 4,096 bytes) at 64 patches; first patch and 8 newest always kept; random is the mean of 3 draws. Examples are copied from that file, not edited. Statements about why are marked as hypotheses.
+The Part 1 proposal pledged a qualitative scrutiny of where eviction wounds the prediction, and this document redeems the pledge. Everything below is drawn from `results/part3/error_analysis.md` and `results/part3/generation_divergence.md`, written by `python scripts/error_analysis_part3.py` (CPU, about two minutes) and `python scripts/generation_divergence.py` (CPU, about three) from the seed-0 entropy-patched models of the `v0.3-part3` release and the validation documents. The arrangement: TinyStories, 100 documents (74,760 bytes) at a budget of 32 patches; WikiText-103, 30 documents (122,880 bytes, each cut to 4,096 bytes) at 64 patches; the first patch and the eight newest always spared; random is the mean of three draws. Examples are transcribed from those files, unaltered. Whatever is offered in explanation is marked a hypothesis.
 
 ## Where the extra loss falls
 
@@ -48,7 +48,7 @@ Patch length of what is kept (all evictable patches average 4.63 bytes on TinySt
 | WikiText | keep high entropy | 1.13 | 99.7% |
 | WikiText | keep low entropy | 9.20 | 0.0% |
 
-The mean-entropy rule keeps almost only one- and two-byte patches. This is a length confound: a patch starts where the next byte is surprising, so the surprising byte often ends up in a patch of its own and the mean over a short patch is high. It explains part of what the entropy cache looks like but not the whole result: the sum rule, which favours long patches, ties random on TinyStories and is worse on WikiText, and the maximum rule is closer to random but still worse in most seeds (`docs/results_summary.md`, ablation sections), so no scoring rule we tried is robustly better than random.
+The mean-entropy rule retains almost nothing but patches of one or two bytes. This is a confound of length: a patch begins where the next byte is surprising, so the surprising byte frequently ends in a patch of its own, and the mean over so short a patch runs high. It accounts for part of what the entropy cache looks like, though not for the whole result: the sum rule, which favours long patches, ties random on TinyStories and is worse on WikiText, and the maximum rule is closer to random but still worse in most seeds (`docs/results_summary.md`, ablation sections), so no scoring rule we tried is robustly better than random.
 
 ## Which bytes pay
 
@@ -64,9 +64,9 @@ Extra loss over the full cache in bits per byte, by class of the target byte:
 | WikiText | uppercase letter | 4,627 | +0.0208 | +0.0125 | -0.0083 |
 | WikiText | digit | 2,444 | +0.0126 | -0.0073 | -0.0199 |
 
-The entropy rule helps a little on digits and capitals in WikiText (bytes that mark rare, specific tokens) and loses on word beginnings and word interiors. The harm is concentrated: entropy is worse than recency on 40.7% (TinyStories) and 51.0% (WikiText) of bytes, better on 33.1% and 42.4%, and the largest 1 percent of bytes by loss increase carry 30.4% and 18.0% of the total increase.
+The entropy rule helps a little on digits and capitals in WikiText (bytes that announce rare and particular tokens) and loses on word beginnings and word interiors. The harm is concentrated: entropy is worse than recency on 40.7% (TinyStories) and 51.0% (WikiText) of bytes, better on 33.1% and 42.4%, and the largest 1 percent of bytes by loss increase carry 30.4% and 18.0% of the total increase.
 
-## Seven examples (real output)
+## Eight examples (real output)
 
 **1. Patches on a TinyStories text** (document 0, 1,201 bytes, 297 patches, 4.0 bytes per patch, full-cache BPB 0.734; `|` marks a boundary):
 
@@ -74,7 +74,7 @@ The entropy rule helps a little on digits and capitals in WikiText (bytes that m
 Once upon a time|, in a |big |forest, there li|ved a |r|hinoceros |named |R|o|xy. |Ro|x|y |loved to |c|limb. |She |c|limbed |trees, |r|o|cks, and |h|i|lls. |One day, |Ro|x|y |found an |i|cy |h|ill. |She |had |never |seen |anything |like |it| |before. |It was |shiny and |c|old|, |and |she |wanted to |c|limb it.  |Ro|x|y |t|ried to |climb |the |icy |hill, but |it was |very |s|lippery. |She |t|ried |again and |again, |b
 ```
 
-The boundaries cut the name Roxy into `R|o|xy` and `Ro|x|y` and place breaks before surprising letters (`c|limb`, `r|o|cks`). Predictable function words (`She `, `never `, `anything `) form whole patches.
+The boundaries dissect the name Roxy into `R|o|xy` and `Ro|x|y` and fall before surprising letters (`c|limb`, `r|o|cks`), while predictable function words (`She `, `never `, `anything `) remain whole patches.
 
 **2. What each rule keeps at the end of document 0** (budget 32; first part of the kept text):
 - recency, BPB 0.744 (+0.010 over full): `played |together |all the |time. |And |Ro|x|y |l|earned that |w|ith |a |little |h|elp| |from |a| |f|riend|, |s|he |c|ould |c|l|imb |anything.`
@@ -82,7 +82,7 @@ The boundaries cut the name Roxy into `R|o|xy` and `Ro|x|y` and place breaks bef
 - keep high entropy, BPB 0.751 (+0.017): ` |s|f| |B|s|s|Ro| |b|f|b|f|a|s|a|i| |a|a | |a| |s|he |c|ould |c|l|imb |anything.`
 - keep low entropy, BPB 0.743 (+0.009): `Once upon a time|, in a |forest, there li|limb. |limbed |One day, |found an |never |seen |ried |again, |anted to |Why are you |ooked |reached the |From that day on|best of friends,|imbed |played |together |And |earned that |riend|s|he `
 
-The high-entropy cache is a string of one-letter fragments (`s|f| |B|s|s`); it keeps the fragment `Ro` of the name but not `Roxy`. The low-entropy cache holds whole words and phrases from the start of the story.
+The high-entropy cache is a rosary of one-letter fragments (`s|f| |B|s|s`); it keeps the fragment `Ro` of the name but not `Roxy`. The low-entropy cache holds whole words and phrases from the opening of the story.
 
 **3. Patches and a high-entropy cache on WikiText** (document 0, 4,096 bytes, 957 patches, 4.3 bytes per patch, full-cache BPB 1.719):
 
@@ -90,19 +90,21 @@ The high-entropy cache is a string of one-letter fragments (`s|f| |B|s|s`); it k
 = |H|o|marus |ga|mmaru|s |= |Ho|maru|s |ga|mmaru|s |, |known as |the |E|uropean |lobster |or |common |lobster |, |is |a |s|pecies of |clawed lo|bster |from |the |e|astern |A|tlantic |O|cean |, |Me|diterranean |S|e|a |and |parts of the |Black |S|ea |. |It |is |closely |re|lated to |the |A|merican |lobster |, |H. |a|mericanus |. |It |may |grow |to |a |length of |6|0 |cm ( 2|4 in ) |and |a |mass |of |6| |kilograms ( 1|3
 ```
 
-At 64 patches, BPB is 1.725 under recency (+0.006 over full), 1.732 under random (+0.013), 1.739 under keep low entropy (+0.020) and 1.752 under keep high entropy (+0.033). The high-entropy cache at the last patch is `o|Ho|E|A|O|S|A|a|6| |a |e|5 |1|e|e|1| |e|e|d |d |a| |d |a|A|a|a|a|a|a|a|d |a|a|e|a|3|a |a |e|e|1|a|e|1| |a |a|1| | |A|O|A|, |and |along only |the |north-|west |coast of |t`: capitals, digits and vowels with no words. The recency cache holds the section on distribution (`Norway |to |the |A|zores |and |Mo|r|occo`).
+At 64 patches, BPB is 1.725 under recency (+0.006 over full), 1.732 under random (+0.013), 1.739 under keep low entropy (+0.020) and 1.752 under keep high entropy (+0.033). The high-entropy cache at the last patch is `o|Ho|E|A|O|S|A|a|6| |a |e|5 |1|e|e|1| |e|e|d |d |a| |d |a|A|a|a|a|a|a|a|d |a|a|e|a|3|a |a |e|e|1|a|e|1| |a |a|1| | |A|O|A|, |and |along only |the |north-|west |coast of |t`: capitals, digits and vowels, with not a word among them. The recency cache holds the section on distribution (`Norway |to |the |A|zores |and |Mo|r|occo`).
 
-**4. Largest loss increase, TinyStories** (document 7, byte 440, target in brackets): `o, he asked his friends to help him.  Together, [T]`. Full cache 1.51 bits, recency 1.32, keep high entropy 8.64. A capital that starts the next word after a comma costs 7 extra bits when the cache holds fragments.
+**4. Largest loss increase, TinyStories** (document 7, byte 440, target in brackets): `o, he asked his friends to help him.  Together, [T]`. Full cache 1.51 bits, recency 1.32, keep high entropy 8.64. A capital opening the next word after a comma costs seven extra bits when the cache holds fragments.
 
-**5. Largest loss increase, locally predictable byte** (document 56, byte 617): `. He wanted his truck to be the best. They argue[d]`. Full cache 0.02 bits, recency 0.01, keep high entropy 5.97. The byte is almost certain from the last few bytes, yet it costs six bits under entropy eviction. Hypothesis (not tested): the global state that feeds the decoder is computed from the attended cache, and a cache of fragments gives a distorted state even for easy bytes. The 8 newest patches are protected, so the recent bytes are present; what changes is everything older.
+**5. Largest loss increase, locally predictable byte** (document 56, byte 617): `. He wanted his truck to be the best. They argue[d]`. Full cache 0.02 bits, recency 0.01, keep high entropy 5.97. The byte is almost certain from the last few bytes, yet it costs six bits under entropy eviction. Hypothesis (untested): the global state that feeds the decoder is computed from the attended cache, and a cache of fragments yields a distorted state even for easy bytes. The eight newest patches are protected, so the recent bytes are present; what changes is everything older.
 
-**6. Largest loss increase, WikiText** (document 27, byte 1768): `, about 16 miles ( 26 km ) to the northeast , i[s]`. Full cache 0.84 bits, recency 0.86, keep high entropy 4.15. The same pattern on a different corpus: an easy continuation made expensive.
+**6. Largest loss increase, WikiText** (document 27, byte 1768): `, about 16 miles ( 26 km ) to the northeast , i[s]`. Full cache 0.84 bits, recency 0.86, keep high entropy 4.15. The same pattern in a different corpus: an easy continuation rendered expensive.
 
-**7. Where entropy eviction helps** (TinyStories document 13, byte 644): `er back to her mom. All the animals cheered for [S]`. Full cache 4.04 bits, recency 7.35, keep high entropy 3.46. The target is the first letter of the name Sam, which appears several times earlier in the story (checked in the text). Recency scores 7.35 bits, worse than the full cache; the entropy rule scores 3.46, better than the full cache itself. I did not check whether the entropy cache held a patch containing the name. A WikiText case (document 7, byte 2112): `touchdown in the AAA B.C. championship game , he[l]`: 7.66, 8.17 and 3.61 bits. In both the entropy rule beats recency on a surprising byte. Entropy eviction also beats the full cache on some bytes (for example TinyStories document 56, byte 735, `Johnny agreed[.]`: full 4.55 bits, entropy 0.14), so the full cache is not always the best prediction; the attention over many entries is noisy in these small models.
+**7. Where entropy eviction helps** (TinyStories document 13, byte 644): `er back to her mom. All the animals cheered for [S]`. Full cache 4.04 bits, recency 7.35, keep high entropy 3.46. The target is the first letter of the name Sam, which appears several times earlier in the story (checked in the text). Recency scores 7.35 bits, worse than the full cache; the entropy rule scores 3.46, better than the full cache itself. We did not verify whether the entropy cache held a patch containing the name. A WikiText case (document 7, byte 2112): `touchdown in the AAA B.C. championship game , he[l]`: 7.66, 8.17 and 3.61 bits. In both the entropy rule beats recency on a surprising byte. Entropy eviction also beats the full cache on some bytes (for example TinyStories document 56, byte 735, `Johnny agreed[.]`: full 4.55 bits, entropy 0.14), so the full cache is not invariably the best prediction; the attention over many entries is noisy in these small models.
+
+**8. Generations that part company** (`results/part3/generation_divergence.md`; greedy continuation of the same prompt, eighty bytes, entropy patches and eviction masks recomputed at every step). TinyStories document 0, prompt of 700 bytes, 32 patches: the full cache continues `find your friends."  Roxy was so happy to help Roxy.`; recency diverges at byte 17 (`find your friends to climb the leaves."`), random and keep-low-entropy at byte 10 (`find your home and they would...`), and keep-high-entropy at byte 25 (`Roxyy said, "Thank you, Billy.`). WikiText document 1, prompt of 1,500 bytes, 64 patches: recency stays with the full cache until byte 65, whereas random and keep-high-entropy diverge at the very first byte (`r the 1970 [dash] 1996 season`). Greedy text from models so small is repetitive (`the state of the state`), and on these four prompts no policy reproduces the true continuation better than the full cache by more than three bytes of eighty; the examples show where a compressed cache alters the prediction, not how good the prose is.
 
 ## Reading
 
-- The entropy rule does keep a different set of patches: almost only high-entropy, one-byte fragments. Sometimes that helps (example 7); on average it hurts because those fragments carry little reusable context and because it throws away the low-entropy patches that carry words and phrases.
+- The entropy rule does keep a different set of patches: almost exclusively high-entropy, one-byte fragments. Now and then that helps (example 7); on average it hurts, because such fragments carry little context worth reusing and because the rule discards the low-entropy patches that carry words and phrases.
 - The damage is concentrated in a small share of bytes (the top 1 percent carry 18.0% to 30.4% of the extra loss), and many of those bytes are easy for the full cache.
-- This matches the attention result, where old high-entropy patches receive less attention than low-entropy ones in the middle and upper layers of most models (`results/part3/attention_*.md`). It is a correlation. No intervention in this analysis separates a length effect, an entropy effect and a distortion of the global state.
+- This agrees with the attention result, in which old high-entropy patches receive less attention than low-entropy ones in the middle and upper layers of most models (`results/part3/attention_*.md`). It is a correlation; no intervention here separates an effect of length, an effect of entropy and a distortion of the global state.
 - One seed per dataset and a fixed budget: the tercile and byte-class tables are descriptive, not tests. The tests are the paired comparisons in `results/part3/seeds.md`.

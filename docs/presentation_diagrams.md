@@ -1,6 +1,6 @@
-# Presentation diagrams (Mermaid)
+# Diagrams for the talk (Mermaid)
 
-Diagrams for explaining the project in the viva and the presentation. They render on GitHub and in any Markdown viewer with Mermaid support. PNG copies for slides are in `report/presentation/mermaid/` (built by `python scripts/render_mermaid.py`). Numbers are copied from `docs/results_summary.md` and `results/part3/`.
+Diagrams in aid of explanation at the viva and the presentation. They render on GitHub and in any Markdown viewer that speaks Mermaid; PNG copies for the slides live in `report/presentation/mermaid/` (rebuilt by `python scripts/render_mermaid.py`, which needs `pip install playwright` and a Chromium, passed with `--chromium`). The figures are transcribed from `docs/results_summary.md` and `results/part3/`.
 
 ## 1. The story in one picture
 

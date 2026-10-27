@@ -1,6 +1,6 @@
-# Part 1 proposal against what was delivered
+# The Part 1 proposal, weighed against what was delivered
 
-Source of the commitments: the Part 1 proposal (27 Aug 2026) and the Part 2 report (15 Oct 2026). Evidence for each row is in the named file.
+The commitments are those of the Part 1 proposal (27 Aug 2026) and the Part 2 report (15 Oct 2026); the evidence for each row resides in the file named beside it. A promise is only as good as its audit, and this is ours.
 
 | Commitment | Delivered | Evidence |
 |---|---|---|
@@ -20,4 +20,4 @@ Source of the commitments: the Part 1 proposal (27 Aug 2026) and the Part 2 repo
 | Risk: variable-length patching hard to implement; fall back to fixed stride | Entropy patching worked; fixed strides 4 and 5 kept as controls | `results/part3/seeds.md` |
 | Plan: Part 3 report, demo and final results by 21 Nov | Experiments finished 25 Oct; report, supplement, slides, demo script and viva notes written | `report/`, `docs/demo_script.md`, `docs/presentation_notes.md` |
 
-Changes from the proposal, stated openly: the entropy hypothesis was not supported; TinyStories was used at 30,000 stories because of compute; Kneser-Ney uses one discount per order; and the planted-name retrieval probe cannot discriminate between policies at this scale.
+Departures from the proposal, confessed without ceremony: the entropy hypothesis was not supported; TinyStories was used at 30,000 stories because of compute; Kneser-Ney uses one discount per order; and the planted-name retrieval probe cannot discriminate between policies at this scale.
