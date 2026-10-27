@@ -7,7 +7,7 @@
 \usepackage{graphicx}
 \usepackage{booktabs}
 \usepackage{array}
-\usepackage[labelfont=it,font=footnotesize,labelsep=period]{caption}
+\usepackage[labelfont=it,font=small,labelsep=period]{caption}
 \usepackage[numbers,sort&compress]{natbib}
 \usepackage{enumitem}
 \usepackage{tikz}
@@ -19,6 +19,8 @@
 \setlength{\bibsep}{1pt}
 \usepackage{titlesec}
 \usepackage{balance}
+\usepackage{cuted}
+\usepackage{dblfloatfix}
 \titleformat{\section}{\large\bfseries}{\thesection}{0.6em}{}
 \titleformat{\subsection}{\normalsize\bfseries}{\thesubsection}{0.6em}{}
 \titlespacing*{\section}{0pt}{1.3ex plus .3ex minus .2ex}{0.8ex plus .1ex}
@@ -30,13 +32,14 @@
 \setlength{\dblfloatsep}{9pt plus 2pt minus 2pt}
 \setlength{\abovecaptionskip}{4pt}
 \setlength{\belowcaptionskip}{0pt}
-\renewcommand{\bibfont}{\footnotesize}
+\interlinepenalty=10000
+\raggedbottom
+\renewcommand{\bibfont}{\small}
 \newcommand{\bpb}{\textsc{bpb}}
 
 \title{Patch-Aware KV Cache Compression for Byte-Level Language Models:\\A Controlled Study of Attention-Guided, Entropy-Guided and Recency Eviction}
 \author{\small Aditya Rayaprolu, Kshitij Gupta, Dhwaj Kishore, Arnab Hazra, Riyazuddin Khan\\[2pt]\small CS F429 Natural Language Processing, BITS Pilani Hyderabad Campus, Group 12}
 \date{}
-\renewcommand{\normalsize}{\fontsize{10.5}{12.6}\selectfont}
 
 \begin{document}
 \normalsize
@@ -49,21 +52,21 @@ Byte-level language models eliminate the tokenizer and thereby avoid its charact
 \section{Introduction}
 \textit{Task.} We study language modelling, that is, the prediction of each symbol of a text from the symbols that precede it. Models are evaluated in bits per byte (\bpb) on held-out documents, lower values being better. Production systems generally operate on subword tokens produced by BPE \citep{sennrich2016bpe}. Byte-level models dispense with the tokenizer and are consequently robust to rare words, typographical errors, code and non-English scripts \citep{xue2022byt5,yu2023megabyte,slagle2024spacebyte,pagnoni2024blt}. The cost is sequence length: a byte sequence is approximately four times longer than its BPE counterpart (4.0 bytes per token in our data).
 
-\textit{Motivation.} During generation, a decoder stores the keys and values of all preceding positions in every layer. This KV cache, rather than the model weights, constrains batch size and context length at deployment. A byte-level Transformer of our width requires 151 MB per sequence at 16,384 bytes, compared with 38 MB for BPE (Figure~\ref{fig:memory}). The BLT \citep{pagnoni2024blt} applies its large global Transformer to patches of bytes and therefore retains one cache entry per patch. To determine patch boundaries it already computes the entropy of the next-byte distribution, a measure of the model's predictive uncertainty.
-
-\begin{figure*}[t]
-\centering\includegraphics[width=\textwidth]{figures/fig_entries.pdf}
-\caption{Why patches relieve the cache. The first 43 bytes of a genuine TinyStories document (spaces shown as underscores) and the four entropy patches into which the model gathers them. A byte-level model stores one key-value entry per byte; the BLT-style model stores one per patch.}\label{fig:entries}
-\end{figure*}
+\textit{Motivation.} During generation, a decoder stores the keys and values of all preceding positions in every layer. This KV cache, rather than the model weights, constrains batch size and context length at deployment. A byte-level Transformer of our width requires 151 MB per sequence at 16,384 bytes, compared with 38 MB for BPE. The BLT \citep{pagnoni2024blt} applies its large global Transformer to patches of bytes and therefore retains one cache entry per patch. To determine patch boundaries it already computes the entropy of the next-byte distribution, a measure of the model's predictive uncertainty.
 
 \textit{Choice of problem.} The Part 1 proposal rested on three observations: the KV cache, rather than the weights, limits the number of users that can share a GPU and the context length that can be served; tokenizer-free models quadruple that cache; and the entropy used by the BLT to place patches is discarded after patching, whereas existing eviction methods rely on recency or on run-time attention scores. The problem is practically relevant, small enough to study from scratch on a single GPU, and informative irrespective of the outcome.
 
 \textit{Research question.} Can this entropy additionally determine which patches to retain when the cache is full, or which to store at reduced precision? The signal is available at no extra cost, so a positive answer would yield a free compression criterion. Prior work uses uncertainty to set cache budgets or as one component of a composite score, in subword models (Section~\ref{sec:related}); to our knowledge, entropy-ranked retention has not been evaluated in byte-level models. We compare it with random, recency and attention-based criteria at equal cache size in bytes. It performs worse than all three, whereas the same experimental protocol yields four positive results (Table~\ref{tab:gain}).
 
+\begin{figure*}[!t]
+\centering\includegraphics[width=\textwidth]{figures/fig_entries.pdf}
+\caption{Why patches relieve the cache. The first 43 bytes of a genuine TinyStories document (spaces shown as underscores) and the four entropy patches into which the model gathers them. A byte-level model stores one key-value entry per byte; the BLT-style model stores one per patch.}\label{fig:entries}
+\end{figure*}
+
 \textit{Summary of findings.} Consider a passage of 1,000 bytes. A byte-level Transformer stores 1,000 cache entries; the present model groups the bytes into approximately 220 patches and stores 220 entries, about 2 MB. Retaining the patches of highest entropy is a poor criterion: it selects fragments of one or two bytes, discards whole words, and underperforms random selection. Two alternatives succeed. Ranking patches by the model's own attention and storing the retained entries in 4 bits reduces the cache to 7.4\% of its original size at a cost of $0.0012$ \bpb. A fixed-size cache permits decoding of documents four times longer than the training context, in constant memory, with lower loss than resetting the context at each boundary.
 
-\begin{table*}[t]
-\centering\footnotesize
+\begin{table*}[!t]
+\centering\small
 \caption{This work against the previous techniques. ``Previous'' is the Part 2 pipeline (n-gram and BPE Transformer), the standard recency (StreamingLLM-style) cache, context resets for long documents, and a byte-level Transformer. Evidence in the sections named in the last column.}\label{tab:gain}
 \begin{tabular}{@{}>{\raggedright\arraybackslash}p{2.5cm}>{\raggedright\arraybackslash}p{4.3cm}>{\raggedright\arraybackslash}p{8.0cm}p{1.6cm}@{}}
 \toprule
@@ -82,7 +85,7 @@ Entropy-guided retention (the proposal) & Random and recency & Not an improvemen
 
 
 \section{Literature survey}\label{sec:related}
-\textit{Tokens and bytes.} BPE merges frequent byte pairs into a fixed vocabulary \citep{sennrich2016bpe}. Token-free models operate directly on bytes: ByT5 \citep{xue2022byt5} shows that a standard Transformer on bytes is competitive in parameters, training compute and inference speed, and more robust to noise; MegaByte \citep{yu2023megabyte} combines a local model within patches with a global model between them; SpaceByte \citep{slagle2024spacebyte} inserts larger blocks after word-boundary bytes such as spaces. The Byte Latent Transformer \citep{pagnoni2024blt} forms patches dynamically from the next-byte entropy of a small byte model, applies a large latent Transformer to them, and reports a FLOP-controlled scaling study up to 8B parameters in which patches scale better than tokens at fixed inference cost. Our model is a simplified BLT, with mean pooling in place of cross-attention, no n-gram hash embeddings, and 13.3M parameters.
+\textit{Tokens and bytes.} BPE merges frequent byte pairs into a fixed vocabulary \citep{sennrich2016bpe}. Token-free models operate on bytes: ByT5 \citep{xue2022byt5} is competitive with subword models and more robust to noise; MegaByte \citep{yu2023megabyte} combines a local model within patches with a global model between them; SpaceByte \citep{slagle2024spacebyte} inserts larger blocks after word-boundary bytes. The Byte Latent Transformer \citep{pagnoni2024blt} forms patches dynamically from the next-byte entropy of a small byte model, applies a large latent Transformer to them, and shows in a FLOP-controlled study up to 8B parameters that patches scale better than tokens. Our model is a simplified BLT with mean pooling in place of cross-attention, no n-gram hash embeddings, and 13.3M parameters.
 
 \textit{KV cache eviction.} StreamingLLM retains a few initial ``sink'' positions and a recent window, which allows a model to stream far beyond its training length \citep{xiao2024streaming}. H2O retains the ``heavy hitters'', the positions with the largest accumulated attention \citep{zhang2023h2o}. SnapKV selects the positions attended to by the last queries of the prompt \citep{li2024snapkv}. All three operate on subword models. We implement recency with a sink, H2O and a SnapKV-style rule (attention from the last 16 patches) as policies over patch entries.
 
@@ -90,13 +93,13 @@ Entropy-guided retention (the proposal) & Random and recency & Not an improvemen
 
 \textit{Uncertainty in cache management.} CONF-KV sets the per-step cache budget from the next-token entropy and ranks tokens by attention and recency, with random eviction as a control \citep{li2026confkv}. InfoKV combines predictive entropy and representation change with attention \citep{kai2026infokv}; counter-causal surprise scores cached tokens by how well later tokens predict them \citep{gould2026counter}; a learned controller assigns 2 to 16 bits per token from features that include entropy \citep{boroujeni2026bits}; and Scratchpad Patching adds temporary slots within byte patches according to next-byte uncertainty \citep{zheng2026scratchpad}. We read the first two works in full and the abstracts of the others, so our statement of difference from the latter is provisional. In all of these works entropy is one ingredient or sets a budget; to our knowledge none ranks the patches of a byte-level model by entropy alone against random and recency at equal size.
 
-\textit{Relation to widely used models.} Widely used models read BPE tokens (Llama 2: 32k vocabulary, 4k context; Llama 3: 128k vocabulary, up to 128k tokens \citep{touvron2023llama2,llama3team2024}) and address cache growth in the architecture: Llama 3 uses grouped-query attention with 8 key-value heads, a fourfold reduction relative to one KV head per attention head in the 8B model. Eviction and quantization are research methods applied on top of such designs. We study the same bottleneck at a scale that one GPU can train from scratch (13.3M parameters, about 600 times smaller than an 8B model) and for raw bytes, which need about four times as many positions. We make no quality comparison with chat models; what transfers is the measurement protocol, the policies, and the finding that attention-guided rules are effective whereas entropy is not.
+\textit{Relation to widely used models.} Widely used models read BPE tokens and address cache growth in the architecture: Llama 3, for example, uses grouped-query attention with 8 key-value heads, a fourfold reduction relative to one KV head per attention head in the 8B model \citep{llama3team2024}. Eviction and quantization are applied on top of such designs. We study the same bottleneck at a scale that one GPU can train from scratch (13.3M parameters, about 600 times smaller than an 8B model) and for raw bytes, which need about four times as many positions. We make no quality comparison with chat models; what transfers is the measurement protocol, the policies, and the finding that attention-guided rules are effective whereas entropy is not.
 
 
 \textit{The classical baseline.} Interpolated Kneser-Ney smoothing \citep{kneser1995improved,chen1999smoothing} is the most accomplished classical n-gram method and furnishes a floor that any neural model ought to clear.
 
 \section{Dataset}\label{sec:data}
-\begin{table*}[t]
+\begin{table*}[!t]
 \centering\footnotesize
 \caption{Corpora. Bytes are after normalisation and deduplication. Evaluation sets are fixed and shared by every model.}\label{tab:data}
 \begin{tabular}{@{}p{2.3cm}p{4.2cm}p{10.0cm}@{}}
@@ -111,14 +114,14 @@ PG-19 & Pre-1919 books & test split, 100 books (40.5 MB); first 100,000 bytes of
 \end{tabular}
 \end{table*}
 
-\textit{Sources and suitability.} TinyStories \citep{eldan2023tinystories} is a synthetic corpus of short stories generated by GPT-3.5 and GPT-4; it permits rapid training of small models and consists of short documents (about 890 bytes). WikiText-103 \citep{merity2016pointer} contains long Wikipedia articles (about 18 KB each), which are suitable for experiments on long-context caches. Both are available in a standard, citable form and lie at opposite ends of difficulty (our baselines reach 0.69 and 1.52 \bpb). The Stack \citep{kocetkov2022stack} (the Smol sample) adds code, since a byte model should handle it. PG-19 \citep{rae2019compressive} supplies very long documents. The first three corpora serve for training and validation; the Wikipedia test split was used once, at the end.
+\textit{Sources and suitability.} TinyStories \citep{eldan2023tinystories} is a synthetic corpus of short stories generated by GPT-3.5 and GPT-4 (about 890 bytes each), which permits rapid training of small models. WikiText-103 \citep{merity2016pointer} contains long Wikipedia articles (about 18 KB each), suitable for experiments on long-context caches. The two lie at opposite ends of difficulty (our baselines reach 0.69 and 1.52 \bpb). The Stack \citep{kocetkov2022stack} (the Smol sample) adds code, and PG-19 \citep{rae2019compressive} supplies very long documents. The first three corpora serve for training and validation; the Wikipedia test split was used once, at the end.
 
-\textit{Limitations and bias.} TinyStories is synthetic, narrow and repetitive, and long training overfits it (37 epochs of a 26.7 MB file, Section~\ref{sec:scale}). WikiText-103 is English and encyclopedic, and therefore reflects the topics and registers that Wikipedia covers while under-representing conversational and non-English text. The Stack sample consists of permissively licensed code from which only exact duplicates were removed, so near-duplicate files may make validation code slightly easier. PG-19 is early twentieth-century and earlier literary English, far from the WikiText training distribution, and its \bpb{} is correspondingly high. The copy of WikiText training data used for the demonstration is limited to 3,000 articles to keep the download small; all reported runs use the full corpus.
+\textit{Limitations and bias.} TinyStories is synthetic, narrow and repetitive, and long training overfits it (37 epochs of a 26.7 MB file). WikiText-103 is English and encyclopedic, and under-represents conversational and non-English text. The code sample consists of permissively licensed files from which only exact duplicates were removed, so near-duplicates may make validation code slightly easier. PG-19 is literary English of the early twentieth century and earlier, far from the WikiText distribution, and its \bpb{} is correspondingly high. The copy of WikiText training data used for the demonstration is limited to 3,000 articles to keep the download small; all reported runs use the full corpus.
 
 \textit{Preprocessing.} WikiText articles were reassembled from the raw line export, which lacks article boundaries, and placeholder tokens such as \texttt{@-@} were restored. All text is NFC-normalised and exact duplicates are removed. Each split is stored as a single uint8 file of UTF-8 bytes with an offset array; documents are separated by a BOS byte and an attention mask; code is split by content hash so that duplicates never occur in more than one split. All thresholds and hyperparameters were tuned on validation data alone.
 
 \section{Method}\label{sec:method}
-\begin{figure*}[t]
+\begin{figure*}[!t]
 \centering
 \begin{tikzpicture}[font=\scriptsize,>=Stealth,node distance=4mm,
 box/.style={draw,rounded corners=2pt,align=center,minimum height=8mm,inner sep=2pt,fill=white},
@@ -176,7 +179,7 @@ Entropy and recency policies are simulated by masks in a single forward pass and
 \subsection{Setup, metrics and baselines}
 \textit{Training budgets.} The principal models are trained on about 98M bytes (3,000 steps). Some WikiText code-mix models are trained for 30,000 steps (about 983M bytes, 1.9 epochs) and at a context of 16,384 bytes. The same checkpoint yields identical scores on the laptop and the cluster GPU.
 
-\textit{Metric.} Bits per byte is the total negative base-2 log-likelihood of a document divided by its length in bytes. It is independent of the tokenizer, so the 4-gram, the BPE Transformer and the byte models are compared on identical text, and it equals the code length per byte that an arithmetic coder driven by the model would achieve \citep{deletang2023compression}. Its limitations are as follows. It measures prediction and not downstream use such as retrieval. Differences between cache policies are small (at most 0.03 \bpb), so every comparison is paired by document and reported with a 95\% bootstrap interval over documents (2,000 resamples). The Part 2 BPE figure is optimistic by 0.4 to 0.5\%, because the first token of each 256-token chunk serves only as context while its bytes are counted (corrected values 0.6978 and 1.5257). Cache size is the mean resident global KV size computed from entry counts and bit widths, and was measured on a GPU for recency alone (Figure~\ref{fig:memory}).
+\textit{Metric.} Bits per byte is the total negative base-2 log-likelihood of a document divided by its length in bytes. It is independent of the tokenizer, so the 4-gram, the BPE Transformer and the byte models are compared on identical text, and it equals the code length per byte that an arithmetic coder driven by the model would achieve \citep{deletang2023compression}. Its limitations are as follows. It measures prediction and not downstream use such as retrieval. Differences between cache policies are small (at most 0.03 \bpb), so every comparison is paired by document and reported with a 95\% bootstrap interval over documents (2,000 resamples). The Part 2 BPE figure is optimistic by 0.4 to 0.5\%, because the first token of each 256-token chunk serves only as context while its bytes are counted (corrected values 0.6978 and 1.5257). Cache size is the mean resident global KV size computed from entry counts and bit widths, and was measured on a GPU for recency alone.
 
 \textit{Baselines.} The classical baseline is an interpolated Kneser-Ney byte 4-gram; the modern baseline is a 13.8M-parameter BPE Transformer (6 layers, 6 heads, width 384, 8k vocabulary, 256-token context, 3,000 steps). The cache baselines are the full cache, recency with a sink, random selection, H2O, a SnapKV-style rule, and uniform 8, 4, 3 and 2 bits. The Transformer was trained before gradient clipping was introduced (clipping gives 0.6826 on TinyStories), so the modern baseline is slightly handicapped.
 
@@ -235,7 +238,9 @@ Table~\ref{tab:evict} and Figure~\ref{fig:score} show that entropy-ranked retent
 A possible objection is that a small, briefly trained model makes little use of its cache. WikiText code-mix models trained for 30,000 steps score 1.2949, 1.2983 and 1.3118 \bpb{}, and keeping high entropy costs $+0.0287$, $+0.0284$ and $+0.0238$ against random at 64 patches (compared with $+0.0020$ at 3,000 steps), every interval excluding zero. Any eviction also costs more (recency at 64 patches costs 0.018 \bpb{} over the full cache, up from 0.002), and the fixed-stride model shows the same sign. The TinyStories version overfits (training loss 0.14 nats, validation \bpb{} 1.6493) and is not used. A longer context does not change the conclusion either: our first 16,384-byte models were under-trained and suggested that the penalty diminishes, a conclusion withdrawn after tuning (Section~\ref{sec:challenges}).
 
 \subsection{What works: attention, quantization, bounded memory}
-\textit{Attention-based scoring.}\label{sec:attn} Online, the SnapKV-style rule outperforms recency in all 24 comparisons on the 12 entropy-patched models (by 0.0002 to 0.0077 \bpb, for example $-0.0013$ [$-0.0018$, $-0.0009$] on WikiText code mix, seed 0, 64 patches), and is never worse than its offline approximation. With offline scoring it also beats recency in 33 of 36 test-split cells (the other three are ties) and, for the 30,000-step models, by 0.0051, 0.0057 and 0.0049 at 64 patches. Online H2O is worse than recency in 22 of 24 comparisons, since accumulated attention favours old patches that were popular early. The effect is small (for seed 0 on TinyStories at 32 patches, recency costs 0.0098 over the full cache and the SnapKV-style rule recovers 0.0041), but it is the only signal that outperformed recency, and it is attention rather than surprise.
+\textit{Attention-based scoring.}\label{sec:attn} Online, the SnapKV-style rule outperforms recency in all 24 comparisons on the 12 entropy-patched models (by 0.0002 to 0.0077 \bpb, for example $-0.0013$ [$-0.0018$, $-0.0009$] on WikiText code mix, seed 0, 64 patches), and is never worse than its offline approximation. With offline scoring it also beats recency in 33 of 36 test-split cells (the other three are ties) and, for the 30,000-step models, by 0.0051, 0.0057 and 0.0049 at 64 patches.
+
+Online H2O is worse than recency in 22 of 24 comparisons, since accumulated attention favours old patches that were popular early. The effect is small (for seed 0 on TinyStories at 32 patches, recency costs 0.0098 over the full cache and the SnapKV-style rule recovers 0.0041), but it is the only signal that outperformed recency, and it is attention rather than surprise.
 
 
 \textit{Quantization and combination.} Uniform 4-bit K and V costs 0.0003 to 0.0014 \bpb{} over fp16 across ten models at 27\% of the bytes (uniform 3-bit 0.0014 to 0.0077, 2-bit 0.022 to 0.111). Entropy-guided precision tiers are worse than random and recency tiers in all ten models. Eviction combined with 4-bit storage (mean of three seeds) is shown in Table~\ref{tab:combo}: a WikiText cache of 128 patches in 4-bit holds 7.4\% of the full cache bytes and costs $+0.0012$ \bpb{} with SnapKV-style eviction ($+0.0019$ with recency), whereas keeping high entropy costs $+0.0151$. No setting that retains high-entropy patches lies on the bytes-against-\bpb{} frontier.
@@ -256,19 +261,17 @@ recency, 128, 4-bit & n/a & $+0.0019$ (7.4\%)\\
 \end{tabular}
 \end{table}
 
-\begin{figure*}[t]
+\begin{figure*}[!t]
 \centering\includegraphics[width=\textwidth]{figures/fig_stream.pdf}
 \caption{Bounded-memory streaming. Left: WikiText documents longer than 8,192 bytes decoded in 16,384-byte chunks (patch positions four times beyond training); below zero beats resetting the context every 4,096 bytes. Right: 20 PG-19 books of 100,000 bytes decoded one byte at a time (positions about 22,000). Recency is the only policy that is safe on books; keeping high entropy is worst but is confounded by distance (Section~\ref{sec:stream}).}\label{fig:stream}
 \end{figure*}
 
-\textit{Bounded-memory streaming.}\label{sec:stream} Three WikiText code-mix models trained on 4,096-byte chunks decoded 46 validation documents longer than 8,192 bytes under a fixed patch budget. Recency with 64 patches outperforms the chunked full-cache baseline in all three seeds (by 0.0030, 0.0032 and 0.0008 \bpb; with 256 patches by 0.0051, 0.0058 and 0.0035), because the reset discards the context at every chunk boundary whereas a small continuous window does not. The SnapKV-style rule is better still at 64 patches (0.0014, 0.0008 and 0.0024 below recency). Random selection, H2O and keeping high entropy are worse than recency at every budget in all seeds (Figure~\ref{fig:stream}, left). On PG-19, with the 30,000-step model, 256 patches of recency outperform the reset baseline by 0.0086 \bpb{} [0.0079, 0.0093] and the whole-book full cache by 0.145; the whole-book full cache is worse than the reset baseline (by 0.137), indicating that the model makes no use of a context 24 times longer than its training context. Keeping high-entropy patches is $+0.093$ to $+0.122$ worse than recency. Retaining old patches implies attending across distances not seen in training, and we did not renumber positions inside the cache as StreamingLLM does, so PG-19 cannot separate a poor entropy signal from poor long-distance attention.
+\textit{Bounded-memory streaming.}\label{sec:stream} Three WikiText code-mix models trained on 4,096-byte chunks decoded 46 validation documents longer than 8,192 bytes under a fixed patch budget. Recency with 64 patches outperforms the chunked full-cache baseline in all three seeds (by 0.0030, 0.0032 and 0.0008 \bpb; with 256 patches by 0.0051, 0.0058 and 0.0035), because the reset discards the context at every chunk boundary whereas a small continuous window does not. The SnapKV-style rule is better still at 64 patches (0.0014, 0.0008 and 0.0024 below recency). Random selection, H2O and keeping high entropy are worse than recency at every budget in all seeds (Figure~\ref{fig:stream}, left).
 
-\begin{figure*}[t]
-\centering\includegraphics[width=\textwidth]{figures/fig_memory.pdf}
-\caption{Cache memory. Left: computed KV size per sequence. Middle and right: measured on a GPU, one stream, real eviction of recency. A bounded cache holds the global cache at 0.59 to 2.36 MB while a full cache reaches 136.5 MB at 65,536 bytes; time per byte stays at 0.9 ms against a rise to 2.0 ms. The first recency point includes warm-up.}\label{fig:memory}
-\end{figure*}
+On PG-19, with the 30,000-step model, 256 patches of recency outperform the reset baseline by 0.0086 \bpb{} [0.0079, 0.0093] and the whole-book full cache by 0.145; the whole-book full cache is worse than the reset baseline (by 0.137), indicating that the model makes no use of a context 24 times longer than its training context. Keeping high-entropy patches is $+0.093$ to $+0.122$ worse than recency. Retaining old patches implies attending across distances not seen in training, and we did not renumber positions inside the cache as StreamingLLM does, so PG-19 cannot separate a poor entropy signal from poor long-distance attention.
 
-\textit{Memory and speed.} Figure~\ref{fig:memory} reports the measured savings. Some fixed costs are not reduced: the 786 KB byte-window caches and the entropy model (about 2.1 MB of window cache, 3.3M parameters), which at 64 patches exceed the global cache. At full precision the patch cache is about 0.9 times the cache of a BPE Transformer of the same width, and a byte-level Transformer requires about four times as much.
+
+\textit{Memory and speed.} A bounded cache holds the global cache at 0.59 to 2.36 MB (64 to 256 patches) while a full cache reaches 136.5 MB at 65,536 bytes, and time per byte stays at 0.9 ms against a rise to 2.0 ms (measured on a GPU, one stream, real eviction of recency). Some fixed costs are not reduced: the 786 KB byte-window caches and the entropy model (about 2.1 MB of window cache, 3.3M parameters), which at 64 patches exceed the global cache. At full precision the patch cache is about 0.9 times the cache of a BPE Transformer of the same width, and a byte-level Transformer requires about four times as much.
 
 \textit{Compute per byte.}\label{sec:flops} The analytic account is a count of operations, not a measurement. The BLT requires fewer operations than a byte-level Transformer (11.1 against 30.9 MFLOPs per byte at a context of 1,024 bytes) but more than the BPE Transformer (7.4), because its local encoder and decoder run on every byte; when patches are produced by entropy it also requires the separate entropy model (8.5 MFLOPs per byte), giving a total of 19.6. A 64-patch cache reduces only the global attention term (0.3 MFLOPs at 1,024 bytes, 1.7 at 4,096). The advantage of the BLT here is therefore cache memory, not FLOPs.
 
@@ -280,48 +283,50 @@ recency, 128, 4-bit & n/a & $+0.0019$ (7.4\%)\\
 \textit{Commitments of the proposal.} The proposal committed to a breakdown of \bpb{} by entropy, a comparison of code with prose, a retrieval probe, and an examination of generations in which the compressed and full models diverge. All four are addressed: Table~\ref{tab:terc}; the code-domain evaluation (prose-only models score 7.2 to 7.6 \bpb{} on code, the 15\% code mix 1.75, and entropy retention is still worse than random there, $+0.0036$); the planted-name test (uninformative); and Example 4 below.
 \input{ea}
 
+\clearpage
+\begin{strip}
 \section{Challenges and how we handled them}\label{sec:challenges}
-The difficulties of Parts 2 and 3 are set out below with what we did about each. Most were found by our own consistency checks before they could mislead a conclusion; the four that obliged us to correct a figure or retire an earlier claim are named as such in the last column.
-
-\begin{table*}[t]
-\centering\footnotesize\renewcommand{\arraystretch}{1.1}
-\caption{Difficulties, our responses, and what became of them.}\label{tab:chal}
+\centering\footnotesize\renewcommand{\arraystretch}{1.0}
+\captionof{table}{Difficulties, our responses, and what became of them; four required correcting a figure or retiring a claim (last column).}\label{tab:chal}
 \begin{tabular}{@{}>{\raggedright\arraybackslash}p{3.6cm}>{\raggedright\arraybackslash}p{6.6cm}>{\raggedright\arraybackslash}p{6.4cm}@{}}
 \toprule
 Challenge & What we did & Outcome\\
 \midrule
-Part 2 \bpb{} counted the first token of each chunk, which is context only & Kept the reported numbers for traceability, disclosed the correction (0.6978 and 1.5257), scored every byte in Part 3 & Corrected: the BPE figure was 0.4 to 0.5\% optimistic\\
-Part 2 groundwork: no article boundaries in WikiText-103; a baseline trained before gradient clipping existed; a demonstration that must run on any machine; blocked cluster submission & Articles rebuilt from the line export with placeholders restored, NFC normalisation and deduplication; reported checkpoints kept (clipping gives 0.6826 against 0.6939); launchers that find or install Python and PyTorch and a demonstration that fetches and safely loads its own models; a request for half a GPU found to be accepted & Clean documents with recorded byte counts; a slightly weaker baseline, stated; rehearsals from a fresh copy passed on a CPU; Part 3 trained on the cluster\\
-One job at a time, a 2-day limit & Checkpoint, handle the pre-limit signal, requeue, resume & Verified end to end under one job id (signal at step 1,864, finish at 24,000)\\
-Code data is gated; prose models score 7 to 8 \bpb{} on code & A team member's login built the set; models retrained with a 15\% code mix & Eviction conclusion unchanged; the mix costs about 0.05 (WikiText) and 0.09 (TinyStories) \bpb\\
-Entropy-model \bpb{} fell below the range we had planned & Causality tests (later bytes never alter earlier predictions, windows limit reach, documents isolated) and bounds from the baselines & No leak; the planned range had been conservative\\
-Training and evaluation must see the same patches & Document masks from BOS positions; boundaries from a cached per-byte entropy array; evaluation chunks begin as training windows do & Consistent; the cache matches direct computation to $10^{-3}$\\
-A CUDA out-of-memory left a half-written entropy cache while the queue carried on & Caught from the log, cache rebuilt, queue now stops if the cache step fails & No training on corrupt data\\
+Part 2 \bpb{} counted context-only tokens & Kept the reported numbers, disclosed the correction (0.6978 and 1.5257), scored every byte in Part 3 & Corrected: the BPE figure was 0.4 to 0.5\% optimistic\\
+Part 2 groundwork: WikiText without article boundaries; baseline trained without gradient clipping; blocked cluster access & Articles rebuilt; checkpoints kept (clipping gives 0.6826 against 0.6939); a half-GPU request found to be accepted & Clean documents; slightly weaker baseline, stated; Part 3 trained on the cluster\\
+One job at a time, a 2-day limit & Checkpoint, handle the pre-limit signal, requeue, resume & Verified under one job id (signal at step 1,864, finish at 24,000)\\
+Gated code data; prose models score 7 to 8 \bpb{} on code & A team member's login built the set; models retrained with a 15\% code mix & Conclusion unchanged; the mix costs about 0.05 (WikiText) and 0.09 (TinyStories) \bpb\\
+Entropy-model \bpb{} below plan; patches must match in training and evaluation & Causality tests, document masks from BOS positions, boundaries from a cached per-byte entropy array & No leak; boundaries consistent to $10^{-3}$\\
+A CUDA out-of-memory left a half-written entropy cache & Caught from the log, cache rebuilt, queue stops if the cache step fails & No training on corrupt data\\
 Seed spread as large as some gaps (0.056 to 0.135 \bpb) & Three seeds for every patching scheme, a stride-5 control, paired bootstrap by document & Retired: a single-seed 3.3\% claim; the eviction sign holds in every seed\\
-Cache byte shares were halved by a counting error & Found when eviction and quantization rows were put in one table (1,669 KB against 839 KB); fixed, every evaluation rerun & Corrected: \bpb{} unaffected, shares restated\\
+Cache byte shares halved by a counting error & Found when two tables disagreed (1,669 KB against 839 KB); fixed, every evaluation rerun & Corrected: \bpb{} unaffected, shares restated\\
 First 16,384-byte models under-trained (1.89 \bpb) & Tuned learning rate and batch size on validation (1.5843) & Retired: the penalty does not fade with context; context length and training amount are not separated\\
-TinyStories overfits at 30,000 steps (37 epochs) & Used the WikiText scale-up (1.9 epochs) as the evidence & TinyStories rows reported for completeness only\\
-Offline attention scores only approximate online policies & Built and tested an online implementation & Online SnapKV-style better than recency in 24 of 24\\
-The models do not retrieve (planted-name test) & Reported retention rates, drew no retrieval conclusion & Claims confined to prediction quality\\
-PG-19 ships as a loading script current libraries do not run & Used a community mirror of the same test split and recorded the substitution & 20 books streamed byte by byte\\
-The central hypothesis was refuted & Reported as measured; tried the obvious escape routes (other scores, the model's own entropy, sink size, byte-level cache, more training, longer context, a protected recency window); added attention rules; analysed what the entropy rule keeps & A reproducible negative result with a mechanism, beside working compression: SnapKV-style eviction, 4-bit storage, bounded-memory streaming\\
+TinyStories overfits at 30,000 steps; the PG-19 loader is unsupported & WikiText scale-up as the evidence; a community mirror of the same PG-19 split & TinyStories rows for completeness only; 20 books streamed byte by byte\\
+Offline attention scores approximate; models do not retrieve & Online implementation built and tested; retention rates reported, no retrieval conclusion & Online SnapKV-style better than recency in 24 of 24; claims confined to prediction quality\\
+The central hypothesis was refuted & Reported as measured; tested other scores, own entropy, sink size, a byte-level cache, more training, longer context and a protected recency window; added attention rules; analysed what entropy keeps & A reproducible negative result with a mechanism, beside working compression\\
 \bottomrule
 \end{tabular}
-\end{table*}
+\end{strip}
+
+
 
 \section{Scope of the evidence}\label{sec:limits}
 \begin{itemize}
-\item \textit{Scale and task.} The models have 13.3M parameters and, for the most part, 3,000 training steps; the 30,000-step models show the same sign with larger effects. They do not retrieve named facts (a planted-name test could not tell any policy from another), so every claim concerns prediction quality in bits per byte.
-\item \textit{Data and measurement.} TinyStories has no test split and its long-training result is set aside for overfitting; PG-19 rests on 20 books scored by models trained on other text. Cache sizes are computed from entry counts and were measured on a GPU for recency eviction; quantization is simulated by rounding; FLOPs are analytic.
-\item \textit{Seeds.} Every patching scheme has three seeds in every setting; the 30,000-step fixed-stride model and the 16,384-byte models have one seed apiece, and streaming uses three seeds of a single setting. Seed 0 of the prose-only models was trained on a different GPU, and the same checkpoint scores identically on both.
-\item \textit{Mechanism.} The attention and fragment accounts of why entropy fails are correlational: they show what the rule keeps and what the model reads, without an intervention that separates length, entropy and a distortion of the global state. On PG-19, to keep old patches is also to attend beyond the training range, and H2O and SnapKV-style were not run there.
+\item \textit{Scale and task.} The models have 13.3M parameters and mostly 3,000 training steps (30,000-step models: same sign, larger effects). They do not retrieve named facts (a planted-name test could not tell any policy from another), so claims concern prediction quality.
+\item \textit{Data and measurement.} TinyStories has no test split; PG-19 rests on 20 books scored by models trained on other text; cache sizes are computed from entry counts (measured on a GPU for recency only); quantization is simulated; FLOPs are analytic.
+\item \textit{Seeds.} The 30,000-step fixed-stride and 16,384-byte models have one seed apiece; streaming uses three seeds of one setting.
+\item \textit{Mechanism.} The accounts of why entropy fails (attention, fragment length) are correlational; no intervention separates them.
 \end{itemize}
 
 \section{Conclusion}
-\textit{Novel.} A controlled evaluation of entropy-ranked cache retention on a byte-level patch model, with multiple seeds, paired intervals and a test split; an online, tested implementation of attention policies over patch caches; and measured evidence that a fixed recency or SnapKV-style cache streams documents several times longer than the training context with lower loss than a context reset. \textit{Improved.} Eviction with 4-bit quantization retains 7.4\% of the cache for $+0.0012$ to $+0.0019$ \bpb; SnapKV-style eviction outperforms recency in 24 of 24 comparisons; memory and time per byte remain constant under a bounded cache; and the BLT requires 2.8 times fewer FLOPs per byte than a byte-level Transformer. \textit{Negative.} The entropy used to place patch boundaries is not a useful criterion for selecting patches to retain, and longer training increases its penalty; the error analysis shows that it retains mainly fragments of one and two bytes. The model's own attention is the signal that does select patches usefully, and with it the cache of a byte-level model can be made small and kept bounded as the text grows (verified to 100,000 bytes).
+\textit{Novel.} A controlled evaluation of entropy-ranked cache retention on a byte-level patch model (multiple seeds, paired intervals, a test split); an online, tested implementation of attention policies over patch caches; and measured evidence that a fixed cache streams documents several times longer than the training context with lower loss than a context reset.
 
-\textit{Demonstration.} A command-line demonstration compresses a text under each policy, trains a small byte-level model live, and streams a long text through a bounded cache.
+\textit{Improved.} Eviction with 4-bit quantization retains 7.4\% of the cache for $+0.0012$ to $+0.0019$ \bpb; SnapKV-style eviction outperforms recency in 24 of 24 comparisons; memory and time per byte remain constant under a bounded cache; and the BLT requires 2.8 times fewer FLOPs per byte than a byte-level Transformer.
 
+\textit{Negative.} The entropy that places patch boundaries is not a useful criterion for selecting patches to retain, and longer training increases its penalty; it retains mainly fragments of one and two bytes. The model's own attention is the signal that does select patches usefully, and with it the cache of a byte-level model can be made small and kept bounded as the text grows (verified to 100,000 bytes).
+
+
+\clearpage
 \balance
 \bibliographystyle{plainnat}
 \bibliography{references}

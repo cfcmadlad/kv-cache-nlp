@@ -17,6 +17,11 @@
 Extra charts and the analytic compute table that did not fit in the main report.
 
 \begin{figure}[h]
+\centering\includegraphics[width=\textwidth]{figures/fig_memory.pdf}
+\caption{Cache memory. Left: computed KV size per sequence. Middle and right: measured on a GPU, one stream, real eviction of recency. A bounded cache holds the global cache at 0.59 to 2.36 MB while a full cache reaches 136.5 MB at 65,536 bytes; time per byte stays at 0.9 ms against a rise to 2.0 ms. The first recency point includes warm-up.}
+\end{figure}
+
+\begin{figure}[h]
 \centering\includegraphics[width=\textwidth]{figures/fig_kept.pdf}
 \caption{What each rule keeps at the close of a document. Left and middle: the share of old patches kept, by entropy tercile; keep-high-entropy keeps only high-entropy patches (and keep-low-entropy the contrary). Right: mean length of the kept patches; the entropy rule hoards one-byte fragments.}
 \end{figure}
