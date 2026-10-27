@@ -115,4 +115,15 @@ python scripts/compare_deploy.py pg19 --out results/part3/pg19_stream.md
 
 All experiments are done; tables are in `results/part3/` and the report draft is `docs/report_part3.md`. Details in `PLAN.md`.
 
+Deliverables for the Part 3 submission:
+
+```bash
+python report/make_figures.py
+python scripts/flops.py
+python scripts/error_analysis_part3.py
+cd report && pdflatex main && bibtex main && pdflatex main && pdflatex main
+```
+
+The LaTeX report is `report/main.tex` (references in `report/references.bib`, figures in `report/figures/`, built `report/main.pdf`). The error analysis is `docs/error_analysis_part3.md` (raw output `results/part3/error_analysis.md`), the analytic compute table is `results/part3/flops.md`, the demo rehearsal script is `docs/demo_script.md` and the viva questions by rubric item are in `docs/viva_by_rubric.md` (collated into `docs/viva_notes.md`).
+
 Plan in `PLAN.md`, related work in `NOVELTY.md`, problems and fixes in `CHALLENGES.md`, per-block notes and results in `docs/`.

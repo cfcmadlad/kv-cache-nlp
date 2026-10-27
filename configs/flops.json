@@ -1,0 +1,11 @@
+{
+  "contexts": [1024, 4096, 16384],
+  "cache_patches": 64,
+  "bytes_per_patch": 4.5,
+  "bytes_per_token": 4.0,
+  "bpe_trained_tokens": 256,
+  "blt": {"local_dim": 256, "local_window": 256, "enc_layers": 1, "dec_layers": 2, "global_dim": 384, "global_layers": 6, "expected_params": 13333632},
+  "entropy": {"dim": 256, "window": 512, "layers": 4, "expected_params": 3286784},
+  "bpe": {"dim": 384, "layers": 6, "vocab": 8000, "block": 256, "expected_params": 13817856},
+  "byte_transformer": {"dim": 384, "layers": 6, "vocab": 256}
+}

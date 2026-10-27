@@ -16,3 +16,11 @@ runs/
 slurm/logs/*
 !slurm/logs/.gitkeep
 data/bytes/
+!report/main.pdf
+!report/figures/*.pdf
+report/*.aux
+report/*.bbl
+report/*.blg
+report/*.log
+report/*.out
+report/*.toc
