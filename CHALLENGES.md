@@ -1,10 +1,10 @@
 # Challenges
 
-Each entry: problem, impact, strategy, outcome. Entries marked "to fill" need information I cannot see; the questions are at the end.
+Each entry: problem, impact, strategy, outcome.
 
 ## Part 1
 
-To fill. No Part 1 material was available to me.
+No separate Part 1 problems were recorded. The team confirmed (27 Oct 2026) that the Part 2 entries below stand as the overall problems for Parts 1 and 2.
 
 ## Part 2
 
@@ -31,7 +31,7 @@ Outcome: documents usable; byte counts recorded in stats.json.
 
 ### Release size limit
 
-Problem: the full WikiText-103 train set is too large for the release bundle.
+Problem: the full WikiText-103 train set makes a large release bundle and a slow first download for the demo. The team confirmed (27 Oct 2026) that the cut was our choice of bundle size, not a GitHub limit.
 Impact: demo training on WikiText would not match the original run.
 Strategy: the release copy cuts train to 3,000 documents (138 MB zip, SHA-256 checked); the full corpus rebuilds with `prepare_data.py`.
 Outcome: demo works offline from the bundle.
@@ -151,9 +151,3 @@ Strategy: reported as a limit of models this small; kept the retention numbers (
 Problem: the `deepmind/pg19` dataset ships as a loading script, which current `datasets` no longer runs.
 Strategy: used the `emozilla/pg19` community mirror of the same test split (100 books, 40.5 MB, NFC normalised, split and hash checks pass) and recorded the substitution.
 Outcome: streamed 20 books byte by byte with a real cache. Recency is the only policy that beats resetting the context; the whole-book full cache is worse than the reset baseline because positions run 24 times past the training range, and that confounds the entropy comparison on old patches (see `docs/results_summary.md`).
-
-## Questions for you
-
-1. Part 1: what were the main problems, and what did you do about them?
-2. Any problem from Part 2 that I have missed (data, time, team, tooling)?
-3. Release size limit: is 3,000 documents the real reason, or was it a GitHub limit?
