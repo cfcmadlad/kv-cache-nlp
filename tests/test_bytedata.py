@@ -3,13 +3,10 @@ import subprocess
 import sys
 from types import SimpleNamespace
 
-import numpy as np
-
 from kvc.bytedata import open_split, read_doc, sample_roundtrip, write_split
 from prepare_code import build, split_files, verify
 
 DOCS = ["plain ascii", "café 中文 \U0001f600", "", "line\nbreak\r\n", "x" * 1000]
-
 
 def test_roundtrip_and_offsets(tmp_path):
     stats = write_split(DOCS, tmp_path, "val")
@@ -17,7 +14,6 @@ def test_roundtrip_and_offsets(tmp_path):
     assert stats["num_bytes"] == len(data) == sum(len(d.encode()) for d in DOCS)
     assert [read_doc(data, offsets, i) for i in range(len(DOCS))] == DOCS
     assert sample_roundtrip(tmp_path, "val", DOCS, 100, 0) == len(DOCS)
-
 
 def test_prepare_bytes_cli(tmp_path):
     src, out = tmp_path / "src" / "tinystories", tmp_path / "out"
@@ -32,11 +28,9 @@ def test_prepare_bytes_cli(tmp_path):
                             "--src", str(tmp_path / "src"), "--out", str(out), *extra], capture_output=True, text=True)
         assert r.returncode == 0, r.stderr
 
-
 def fake_records(n):
     langs = ["python", "java", "javascript"]
     return [(langs[i % 3], f"// file {i}\n" + "code line;\n" * 40) for i in range(n)]
-
 
 def test_code_split_no_cross_split_duplicates(tmp_path):
     records = fake_records(600) + fake_records(100) + [("python", "tiny")]
@@ -47,7 +41,6 @@ def test_code_split_no_cross_split_duplicates(tmp_path):
     assert stats["dropped"] == {"size": 1, "duplicate": 100, "null": 0}
     assert sum(stats[s]["num_docs"] for s in ("train", "val", "test")) == 600
     assert stats["val"]["num_docs"] > 0 and stats["test"]["num_docs"] > 0
-
 
 def test_split_is_a_function_of_content():
     a = split_files([("python", "same content " * 30)], 10, 10**6, 5, 5)

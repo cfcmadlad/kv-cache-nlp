@@ -13,7 +13,7 @@ COLORS = {"recency": "#0072B2", "random": "#7F7F7F", "entropy": "#D55E00", "entr
 LABELS = {"recency": "recency", "random": "random", "entropy": "keep high entropy", "entropy_inv": "keep low entropy", "snap": "SnapKV-style", "h2o": "H2O", "uniform": "uniform bits", "tiers": "recent tiers"}
 SEED_STYLE = {0: ("o", "-"), 1: ("s", "--"), 2: ("^", ":")}
 
-plt.rcParams.update({"font.size": 8, "axes.titlesize": 8.5, "axes.labelsize": 8, "legend.fontsize": 7, "xtick.labelsize": 7.5, "ytick.labelsize": 7.5,
+plt.rcParams.update({"font.family": "serif", "font.serif": ["cmr10"], "font.monospace": ["cmtt10"], "mathtext.fontset": "cm", "axes.formatter.use_mathtext": True, "axes.unicode_minus": False, "font.size": 8, "axes.titlesize": 8.5, "axes.labelsize": 8, "legend.fontsize": 7, "xtick.labelsize": 7.5, "ytick.labelsize": 7.5,
                      "axes.spines.top": False, "axes.spines.right": False, "axes.grid": True, "grid.alpha": 0.25, "grid.linewidth": 0.5,
                      "pdf.fonttype": 42, "figure.dpi": 150, "savefig.bbox": "tight"})
 
@@ -155,7 +155,6 @@ def fig_stream(outdir: Path):
     for t in tables("pg19_stream.md"):
         if not t["rows"]:
             continue
-        steps = "30,000 steps" if "x10" in t["title"] else "3,000 steps"
         ls = "-" if "x10" in t["title"] else ":"
         full = re.search(r"reset4096 full cache within chunks: ([\d.]+); whole-book full cache: ([\d.]+)", t["text"])
         for pol in ("recency", "random", "entropy"):
@@ -390,8 +389,8 @@ def fig_seeds(outdir: Path):
 
 def fig_public(outdir: Path):
     import json
-    cfg = json.loads((REPO_ROOT / "configs" / "public_models.json").read_text(encoding="utf-8"))
-    flops = json.loads((REPO_ROOT / "configs" / "flops.json").read_text(encoding="utf-8"))
+    cfg = json.loads((REPO_ROOT / "configs" / "analysis" / "public_models.json").read_text(encoding="utf-8"))
+    flops = json.loads((REPO_ROOT / "configs" / "analysis" / "flops.json").read_text(encoding="utf-8"))
     m, b = cfg["llama3_8b"], cfg["kv_bytes_per_element"]
     head_dim = m["model_dim"] // m["attention_heads"]
     per_token = 2 * m["layers"] * m["kv_heads"] * head_dim * b
@@ -401,7 +400,7 @@ def fig_public(outdir: Path):
     fig, axes = plt.subplots(1, 2, figsize=(7.1, 2.4), gridspec_kw={"width_ratios": [1.1, 1]})
     ax = axes[0]
     ax.plot(ctx, [c * per_token / 1e9 for c in ctx], marker="o", ms=3.5, color="#0072B2", label=f"{m['label']} KV cache (grouped-query, {m['kv_heads']} KV heads)")
-    ax.plot(ctx, [c * per_token_full_heads / 1e9 for c in ctx], ls=":", color="#0072B2", label=f"same, one KV head per attention head (hypothetical)")
+    ax.plot(ctx, [c * per_token_full_heads / 1e9 for c in ctx], ls=":", color="#0072B2", label="same, one KV head per attention head (hypothetical)")
     ax.plot(ctx, [4 * c * per_token / 1e9 for c in ctx], marker="s", ms=3.5, color="#D55E00", label="same model reading bytes: 4x positions (hypothetical)")
     ax.axhline(weights_gb, color="k", lw=0.9, ls="--")
     ax.text(ctx[0] * 1.1, weights_gb * 1.15, f"weights, fp16 (nominal 8B parameters): {weights_gb:.0f} GB", fontsize=6.5)

@@ -11,7 +11,7 @@ PAGE = """<!doctype html><html><body style="margin:0;background:white"><div id="
 
 def main():
     ap = argparse.ArgumentParser()
-    ap.add_argument("--src", default="docs/presentation_diagrams.md")
+    ap.add_argument("--src", default="report/presentation/diagrams.md")
     ap.add_argument("--out", default="report/presentation/mermaid")
     ap.add_argument("--chromium", default=None)
     ap.add_argument("--lib", default="https://cdn.jsdelivr.net/npm/mermaid@10.9.1/dist/mermaid.esm.min.mjs")

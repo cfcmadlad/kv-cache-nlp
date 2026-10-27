@@ -27,7 +27,6 @@ def online_table(resamples: int, seed: int) -> str:
              f"Validation only, 95% document bootstrap intervals ({resamples} resamples). Differences are the first minus the second (negative means the first is better).", ""]
     tally = {}
     for ds, (split, docs, budgets) in SETS.items():
-        n = 500 if "tiny" in ds else 60
         n_online = 300 if "tiny" in ds else 60
         lines += [f"## {ds}", "", "| Model | Budget | recency | recency (online) | h2o offline | h2o online | snap offline | snap online | h2o on - recency | snap on - recency | snap on - snap off |",
                   "|---|---|---|---|---|---|---|---|---|---|---|"]
@@ -213,7 +212,7 @@ def scale_table(resamples: int, seed: int) -> str:
     lines += ["", "## 16,384-byte models: tuning on validation", "", "| Run | Batch | Learning rate | Validation BPB (60 documents) |", "|---|---|---|---|"]
     for run in ("blt_wikitext103mix_L16k_entropy", "blt_wikitext103mix_L16k_entropy_lr3", "blt_wikitext103mix_L16k_entropy_b8", "blt_wikitext103mix_L16k_entropy_b8lr3", "blt_wikitext103mix_L16k_fixed", "blt_wikitext103mix_L16k_fixed_b8"):
         path = REPO_ROOT / "runs" / run / "eval_val_60.json"
-        cfg = REPO_ROOT / "configs" / f"{run}.json"
+        cfg = REPO_ROOT / "configs" / "blt" / f"{run}.json"
         if path.exists():
             c = json.loads(cfg.read_text(encoding="utf-8"))
             lines.append(f"| {run} | {c['batch_size']} | {c['lr']} | {json.loads(path.read_text(encoding='utf-8'))['bpb']} |")

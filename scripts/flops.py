@@ -51,7 +51,7 @@ def fmt(macs: float) -> str:
 
 def main():
     ap = argparse.ArgumentParser()
-    ap.add_argument("--config", default="configs/flops.json")
+    ap.add_argument("--config", default="configs/analysis/flops.json")
     ap.add_argument("--out", default="results/part3/flops.md")
     args = ap.parse_args()
     cfg = json.loads((REPO_ROOT / args.config).read_text(encoding="utf-8"))
@@ -90,7 +90,7 @@ def main():
             (f"BLT, {budget}-patch cache, plus entropy model", blt_macs(blt, n, patch, budget) + entropy_macs(ent, n), min(n / patch, budget), kv_patch),
             (f"BPE transformer 13.8M, full cache{dag(n / token)}", gpt_macs(bpe, n / token) / token, n / token, kv_gpt(bpe)),
             (f"BPE transformer, {budget}-token cache{dag(n / token)}", gpt_macs(bpe, min(n / token, budget)) / token, min(n / token, budget), kv_gpt(bpe)),
-            (f"Byte-level transformer, full cache", gpt_macs(byt, n), n, kv_gpt(byt)),
+            ("Byte-level transformer, full cache", gpt_macs(byt, n), n, kv_gpt(byt)),
             (f"Byte-level transformer, {budget}-entry cache", gpt_macs(byt, min(n, budget)), min(n, budget), kv_gpt(byt)),
             (f"Byte-level transformer, {int(budget * patch)}-entry cache (same text span as {budget} patches)", gpt_macs(byt, min(n, budget * patch)), min(n, budget * patch), kv_gpt(byt)),
         ]:

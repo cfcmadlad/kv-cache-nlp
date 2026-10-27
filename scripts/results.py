@@ -1,11 +1,10 @@
 import argparse
 import json
-import math
 
 import torch
 
 from data_utils import REPO_ROOT, load_ngram, load_transformer, read_jsonl_texts
-from train_bpe_transformer import NATS_TO_BITS, doc_chunks, score_chunks
+from train_bpe_transformer import doc_chunks, score_chunks
 
 CHECKPOINTS = REPO_ROOT / "checkpoints"
 SETS = {"tinystories": ("val", 500), "wikitext103": ("val", 60)}

@@ -86,7 +86,7 @@ Entropy-guided retention (the proposal) & Random and recency & Not an improvemen
 
 \begin{figure*}[t]
 \centering\includegraphics[width=\textwidth]{figures/fig_public.pdf}
-\caption{Left: KV cache of a production-scale model grows linearly with context and passes the size of its weights near 128k tokens (computed from the Llama 3 8B configuration: 32 layers, 8 KV heads of dimension 128; fp16). A byte-reading version of the same model would need four times as many positions (hypothetical). Right: our small models per 1,000 bytes of text; the production figure assumes 4 bytes per token and is not comparable in quality, only in cost structure. Configuration and sources in \texttt{configs/public\_models.json}.}\label{fig:public}
+\caption{Left: KV cache of a production-scale model grows linearly with context and passes the size of its weights near 128k tokens (computed from the Llama 3 8B configuration: 32 layers, 8 KV heads of dimension 128; fp16). A byte-reading version of the same model would need four times as many positions (hypothetical). Right: our small models per 1,000 bytes of text; the production figure assumes 4 bytes per token and is not comparable in quality, only in cost structure. Configuration and sources in \texttt{configs/analysis/public\_models.json}.}\label{fig:public}
 \end{figure*}
 
 \textbf{The classical baseline.} Interpolated Kneser-Ney smoothing \citep{kneser1995improved,chen1999smoothing} is the most accomplished classical n-gram method and furnishes a floor that any neural model ought to clear.
@@ -285,7 +285,7 @@ recency, 128, 4-bit & n/a & $+0.0019$ (7.4\%)\\
 \input{ea}
 
 \section{Challenges and how we handled them}\label{sec:challenges}
-No separate Part 1 difficulties were recorded; the table covers Parts 2 and 3 (full entries in \texttt{CHALLENGES.md}). Most were discovered by our own consistency checks.
+No separate Part 1 difficulties were recorded; the table covers Parts 2 and 3 (full entries in \texttt{docs/CHALLENGES.md}). Most were discovered by our own consistency checks.
 
 \begin{table*}[t]
 \centering\scriptsize

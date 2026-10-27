@@ -1,6 +1,5 @@
 import json
 
-import numpy as np
 import torch
 
 import demo_part3
@@ -9,7 +8,6 @@ from models.entropy import EntropyLM
 from test_blt import SMALL
 
 TEXTS = ["the cat sat on the mat. " * 12, "dogs bark at night. " * 14] * 4
-
 
 def test_live_training_reduces_loss_and_evaluation_rows(monkeypatch):
     monkeypatch.setattr(demo_part3, "TINY", SMALL)
@@ -20,7 +18,6 @@ def test_live_training_reduces_loss_and_evaluation_rows(monkeypatch):
     rows = demo_part3.evaluate_live(model, TEXTS, 12, "cpu")
     assert [r[0] for r in rows][0] == "full cache" and len(rows) == 4
     assert all(r[1] > 0 for r in rows) and rows[1][2] < rows[0][2]
-
 
 def test_stream_compare_bounds_cache_and_matches_full_at_large_budget(tmp_path, monkeypatch):
     import train_blt

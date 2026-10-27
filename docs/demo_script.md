@@ -4,11 +4,11 @@ The demonstration employs `scripts/demo.py`, options 6, 4, 7 and 5, in that orde
 
 ## Arranging it on a desktop
 
-On Windows, double-click `run.bat`; on Linux or macOS, run `./run.sh`. Each launcher locates Python 3.10 or newer (installing it if absent), reuses an existing PyTorch or builds a private environment (`%LOCALAPPDATA%\kv-cache-nlp\venv` on Windows, `~/.cache/kv-cache-nlp/venv` elsewhere), installs the requirements and opens the menu. The first start needs the internet: PyTorch for CPU is about 200 MB, and the release assets are 138 MB and 124 MB. Before the viva, run `python scripts/check_demo.py`; in about five seconds it audits Python, the packages, the assets, a forward pass and the code paths of options 4 and 6, and prints `[ok]` or `[FAIL]` against each.
+On Windows, double-click `run.bat`; on Linux or macOS, run `./run.sh`. Each launcher locates Python 3.10 or newer (installing it if absent), reuses an existing PyTorch or builds a private environment (`%LOCALAPPDATA%\kv-cache-nlp\venv` on Windows, `~/.cache/kv-cache-nlp/venv` elsewhere), installs the requirements and opens the menu. The first start needs the internet: PyTorch for CPU is about 200 MB, and the release assets are 138 MB and 124 MB. Before presenting, run `python scripts/check_demo.py`; in about five seconds it audits Python, the packages, the assets, a forward pass and the code paths of options 4 and 6, and prints `[ok]` or `[FAIL]` against each.
 
-What was verified on 27 Oct 2026 (Linux, four CPU cores, no GPU): a fresh clone whose system Python lacked PyTorch ran `run.sh`, built the private environment (about two minutes, once only) and completed option 4; options 1 to 7 all ran from the menu. What was not verified: `run.bat` on Windows and the launcher on macOS (`CHALLENGES.md` records a Part 2 rehearsal from a fresh unzip that passed). Test both on the machine from which you will present. The menu now refuses cache budgets below ten patches and returns to the menu should an option fail, since a budget of nine or less formerly ended the demonstration with a traceback.
+What was verified on 27 Oct 2026 (Linux, four CPU cores, no GPU): a fresh clone whose system Python lacked PyTorch ran `run.sh`, built the private environment (about two minutes, once only) and completed option 4; options 1 to 7 all ran from the menu. What was not verified: `run.bat` on Windows and the launcher on macOS (`docs/CHALLENGES.md` records a Part 2 rehearsal from a fresh unzip that passed). Test both on the machine from which you will present. The menu now refuses cache budgets below ten patches and returns to the menu should an option fail, since a budget of nine or less formerly ended the demonstration with a traceback.
 
-## Before the viva (five minutes, once)
+## Before the presentation (five minutes, once)
 
 1. `pip install torch --index-url https://download.pytorch.org/whl/cpu` and `pip install -r requirements.txt`, or simply run `run.bat` or `./run.sh`, which attend to Python. The demo itself installs no packages.
 2. `python scripts/demo.py`, then enter `8`. The first run fetches the Part 2 assets (138 MB) and, on first use of option 4 or 7, the Part 3 models (124 MB). With no connection on the day, place `kv-cache-nlp-part2-assets.zip` and `kv-cache-nlp-part3-assets.zip` in the repository folder, its parent or `~/Downloads`; the demo looks there first.
@@ -24,7 +24,7 @@ What was verified on 27 Oct 2026 (Linux, four CPU cores, no GPU): a fresh clone 
 | 3:30 to 6:00 | Option 4, compress a text | Paste a sentence of the examiner's choosing. |
 | 6:00 to 8:00 | Option 7, stream with real eviction | Memory and time on a 4,000-byte text. |
 | 8:00 to 10:00 | Option 5, results | Scroll to the headline tables. |
-| 10:00 to 12:00 | Questions | `docs/viva_notes.md`, `docs/error_analysis_part3.md`. |
+| 10:00 to 12:00 | Questions | `docs/error_analysis.md`, `docs/results_summary.md`. |
 
 ## Option 6: a small byte-level model, trained before their eyes (about 80 seconds on four cores)
 
@@ -73,7 +73,7 @@ uniform 3-bit                          0.744        279.9 KB
 
 With `wikitext103`, Enter, `64` (4,096 bytes, 927 patches, 4.4 bytes per patch): full 1.576 (4276.2 KB), recency 1.580, random 1.582, entropy 1.588, entropy_inv 1.586 (all 569.8 KB), uniform 4-bit 1.577 (1135.9 KB), uniform 3-bit 1.580 (868.6 KB).
 
-Say: the boundaries fall before surprising letters (`c|limb`, `R|o|xy`), which is how entropy patching works. Uniform 4-bit costs 0.001 BPB at 27 percent of the bytes; eviction to 32 patches costs 0.01 at 20 percent. Keeping high-entropy patches (`entropy`) is the worst eviction rule, as in the paper. Point to `docs/error_analysis_part3.md`: the entropy rule hoards one-byte fragments.
+Say: the boundaries fall before surprising letters (`c|limb`, `R|o|xy`), which is how entropy patching works. Uniform 4-bit costs 0.001 BPB at 27 percent of the bytes; eviction to 32 patches costs 0.01 at 20 percent. Keeping high-entropy patches (`entropy`) is the worst eviction rule, as in the paper. Point to `docs/error_analysis.md`: the entropy rule hoards one-byte fragments.
 
 A caution on very short texts: a pasted sentence of 94 bytes (30 patches, budget 16) gave full 1.276, recency 1.280, random 1.274, entropy 1.268, entropy_inv 1.269. Differences of 0.01 BPB on one brief text are noise; read no ranking into them.
 
@@ -105,7 +105,7 @@ Show, in this order: the gate table (the BLT does not beat the BPE Transformer a
 
 ## On single runs
 
-An examiner may point to a line where entropy beats random (it does in option 7 on TinyStories: 0.862 against 0.870). Answer: one text of 4,000 bytes is an anecdote. The evidence is 72 paired comparisons over three seeds, four settings and two budgets, in which keeping high entropy is worse than random in 68 and better in none (`results/part3/seeds.md`), together with the error analysis (`docs/error_analysis_part3.md`).
+An examiner may point to a line where entropy beats random (it does in option 7 on TinyStories: 0.862 against 0.870). Answer: one text of 4,000 bytes is an anecdote. The evidence is 72 paired comparisons over three seeds, four settings and two budgets, in which keeping high entropy is worse than random in 68 and better in none (`results/part3/seeds.md`), together with the error analysis (`docs/error_analysis.md`).
 
 ## The record of testing, and of failure
 

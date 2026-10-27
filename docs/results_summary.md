@@ -15,7 +15,7 @@ Training hardware: seed 0 of the entropy-patched and fixed-stride-4 models was t
 | BLT 13.3M, fixed stride 4 | 0.7726 | 1.7600 | 4.0 | 2.31 MB |
 | BLT 13.3M, entropy patching (seed 0) | 0.7980 | 1.6801 | 4.5 | 2.05 MB |
 
-Part 2 rows reproduce exactly. The BLT-style models do not beat the BPE transformer; this is a smaller, shorter-trained model (3,000 steps, 100M bytes seen) without the n-gram hashing or cross-attention of the original BLT.
+Part 2 rows reproduce exactly. The BLT-style models do not beat the BPE transformer, which is hardly surprising: ours is a smaller, more briefly trained model (3,000 steps, 100M bytes seen) without the n-gram hashing or cross-attention of the original BLT.
 
 ## Seed variance and entropy patching against fixed stride (`python scripts/compare.py seeds`)
 
@@ -28,7 +28,7 @@ Full-cache BPB for three seeds of every patching scheme (seeds 0, 1, 2; mean in 
 | TinyStories, code mix | 0.9019, 0.8925, 0.9396 (0.9114; range 0.047) | 0.9150, 0.9298, 0.9890 (0.9446; range 0.074) | 0.9308, 1.0197, 0.9951 (0.9819; range 0.089) |
 | WikiText, code mix | 1.7190, 1.7117, 1.8139 (1.7482; range 0.102) | 1.7541, 1.7564, 1.8100 (1.7735; range 0.056) | 1.7688, 1.8129, 1.8633 (1.8150; range 0.095) |
 
-Seed spread is as large as most patching gaps, and larger for the fixed-stride models, so the earlier single-seed comparison was too weak. On WikiText entropy patching has lower BPB than both fixed strides in all three seed pairs (by 0.017 to 0.080 against stride 4 and 0.048 to 0.097 against stride 5), with fewer cache entries per byte than stride 4; the mean gap of 0.039 (stride 4) is about the size of the seed ranges, so I call it likely but three seeds do not establish it. On TinyStories entropy patching ties stride 4 (means 0.8183 and 0.8237, ranges of 0.056 and 0.135) and is lower than stride 5 in all three seed pairs. With the code mix entropy patching is lower in 11 of the 12 same-seed comparisons (the exception is WikiText seed 2 against stride 4, 1.8139 against 1.8100), but the seed ranges overlap the gaps. The earlier claim that entropy patching is 3.3 percent worse on TinyStories stays withdrawn. Seed 2 is the worst or near-worst seed for every scheme on TinyStories, which suggests the seed sets the data order more than the patching does. Seed 0 of the prose-only models was trained on a laptop GPU, the rest on the cluster.
+The spread between seeds is as great as most patching gaps, and greater for the fixed-stride models, so that the earlier single-seed comparison was too frail to bear any weight. On WikiText entropy patching has lower BPB than both fixed strides in all three seed pairs (by 0.017 to 0.080 against stride 4 and 0.048 to 0.097 against stride 5), with fewer cache entries per byte than stride 4; the mean gap of 0.039 (stride 4) is about the size of the seed ranges, so we call it likely, though three seeds do not establish it. On TinyStories entropy patching ties stride 4 (means 0.8183 and 0.8237, ranges of 0.056 and 0.135) and is lower than stride 5 in all three seed pairs. With the code mix entropy patching is lower in 11 of the 12 same-seed comparisons (the exception is WikiText seed 2 against stride 4, 1.8139 against 1.8100), but the seed ranges overlap the gaps. The earlier claim that entropy patching is 3.3 percent worse on TinyStories stays withdrawn. Seed 2 is the worst or near-worst seed for every scheme on TinyStories, which suggests the seed sets the data order more than the patching does. Seed 0 of the prose-only models was trained on a laptop GPU, the rest on the cluster.
 
 ## Entropy model checks
 
@@ -77,7 +77,7 @@ Uniform 4-bit is within 0.001 BPB of fp16 at 27 percent of the bytes. Entropy-gu
 
 ## Code mix (`python scripts/compare.py seeds`, `code`, `ablations`, `table`; run names `*wikitext103mix*`)
 
-The code set was built from `bigcode/the-stack-smol` (28,229 files; split and hash checks pass). Models trained on prose alone score 7.64 (TinyStories) and 7.17 (WikiText) BPB on 200 validation code files, close to a uniform byte guess, so code needs training data. The WikiText entropy model and BLT were retrained with 15 percent of each batch drawn from code (`configs/*wikitext103mix*`, `scripts/run_mix.sh`): entropy model, three seeds of the entropy-patched BLT, and fixed strides 4 and 5 as controls. The patch threshold was tuned on WikiText validation only (4.5 bytes per patch there; 4.0 on code).
+The code set was built from `bigcode/the-stack-smol` (28,229 files; split and hash checks pass). Models trained on prose alone score 7.64 (TinyStories) and 7.17 (WikiText) BPB on 200 validation code files, close to a uniform byte guess, so code needs training data. The WikiText entropy model and BLT were retrained with 15 percent of each batch drawn from code (`configs/*wikitext103mix*`, `scripts/campaign/run_mix.sh`): entropy model, three seeds of the entropy-patched BLT, and fixed strides 4 and 5 as controls. The patch threshold was tuned on WikiText validation only (4.5 bytes per patch there; 4.0 on code).
 
 | Model (trained with code mix) | WikiText BPB | Code BPB (200 files) |
 |---|---|---|
@@ -96,7 +96,7 @@ The eviction result on the mixed models:
 
 ## Three seeds for every model, and TinyStories with code (`results/part3/seeds.md`)
 
-Every patching scheme now has three seeds on all four settings (TinyStories and WikiText, with and without the 15 percent code mix; `scripts/run_controls.sh`, `scripts/run_tsmix.sh`). The TinyStories entropy model and BLT were retrained with the code mix as well, so both datasets are treated alike.
+Every patching scheme now has three seeds on all four settings (TinyStories and WikiText, with and without the 15 percent code mix; `scripts/campaign/run_controls.sh`, `scripts/campaign/run_tsmix.sh`). The TinyStories entropy model and BLT were retrained with the code mix as well, so both datasets are treated alike.
 - Over the 72 comparisons (9 models in each of 4 settings, 2 budgets), keeping high-entropy patches is worse than recency with the interval above zero in 70 and indistinguishable in 2; it is worse than random in 68, indistinguishable in 4, and never better than either. The indistinguishable cases are the WikiText code-mix fixed-stride models against random (stride 4: 5 of 6 budget and seed cells worse; stride 5: 3 of 6) and the TinyStories code-mix stride-5 models against recency (4 of 6). The tallies are in `seeds.md`.
 - Keeping low-entropy patches beats keeping high-entropy ones (interval above zero) in all 6 cells for entropy patching on TinyStories with and without code, on WikiText without code, and for fixed strides on TinyStories; for fixed strides on WikiText, and for all schemes on WikiText with code, it is 0 of 6. Over all 72 comparisons keeping low entropy is better in 42, worse in 19 and indistinguishable in 11. So the earlier statement that low-entropy retention is a good policy depends on the data and the patching.
 - TinyStories with code: BLT 0.9114 mean against 0.8183 without code (seed spread 0.047), so the mix costs about 0.09 BPB on TinyStories (the corpus is simple, so 15 percent of the batches spent on code matters more) and 0.05 on WikiText. On code files the TinyStories-mix model scores 1.8842; keeping high entropy is worse than random by +0.0103 at 64 patches and +0.0077 at 128.
@@ -113,7 +113,7 @@ Paired differences against recency (negative means the attention policy is bette
 
 ## Longer context (`python scripts/compare.py long`, `results/part3/long_context.md`; tuning in `results/part3/scale_and_tuning.md`)
 
-WikiText models with the code mix trained and evaluated on 16,384-byte chunks (`configs/blt_wikitext103mix_L16k_*`, `scripts/run_long.sh`, `scripts/run_scale.sh`, `scripts/run_scale2.sh`), budgets 64 to 512 patches, one seed. The first 16k models (batch size 2, same bytes seen as the 4k models) scored worse than the 4k models (1.8920 and 1.8971 against 1.7190 and 1.7541). That was an optimisation problem. Tuning on validation (learning rate 0.001 or 0.0003, batch size 2 or 8):
+WikiText models with the code mix trained and evaluated on 16,384-byte chunks (`configs/blt/blt_wikitext103mix_L16k_*`, `scripts/campaign/run_long.sh`, `scripts/campaign/run_scale.sh`, `scripts/campaign/run_scale2.sh`), budgets 64 to 512 patches, one seed. The first 16k models (batch size 2, same bytes seen as the 4k models) scored worse than the 4k models (1.8920 and 1.8971 against 1.7190 and 1.7541). That was an optimisation problem. Tuning on validation (learning rate 0.001 or 0.0003, batch size 2 or 8):
 
 | Run | Batch | Learning rate | Validation BPB |
 |---|---|---|---|
@@ -124,7 +124,7 @@ WikiText models with the code mix trained and evaluated on 16,384-byte chunks (`
 | L16k fixed stride 4 | 2 | 0.001 | 1.8971 |
 | L16k fixed stride 4 | 8 | 0.001 | 1.6048 |
 
-Batch 8 with learning rate 0.001 gives 1.5843 (entropy patching) and 1.6048 (fixed), better than the 4k models, and I use these as the long-context models. The batch-8 runs see four times more bytes than the 4k models, so part of the gain is more training, not context length; I did not run a 4k model with the same bytes (the 10x-training section below does this for 4k). The earlier long-context conclusions were drawn on the under-trained models and are withdrawn: keeping high entropy does not become harmless at long context.
+Batch 8 with learning rate 0.001 gives 1.5843 (entropy patching) and 1.6048 (fixed), better than the 4k models, and we adopt these as the long-context models. The batch-8 runs see four times more bytes than the 4k models, so part of the gain is more training, not context length; we did not run a 4k model with the same bytes (the 10x-training section below does this for 4k). The earlier long-context conclusions were drawn on the under-trained models and are withdrawn: keeping high entropy does not become harmless at long context.
 - Entropy patching, batch 8: keeping high entropy is worse than random by +0.0192 [+0.0176, +0.0209] at 64 patches, +0.0213 at 128 and 256 and +0.0161 at 512, and worse than recency by 0.041 BPB at 64 patches and 0.025 at 512 (differences of the means, 1.6414 against 1.6001 and 1.6104 against 1.5854).
 - Fixed stride, batch 8: worse than random by +0.0186 (64), +0.0198 (128), +0.0174 (256), +0.0131 (512).
 - snap beats recency at 64 patches (entropy patching -0.0016 [-0.0026, -0.0006], fixed -0.0020 [-0.0029, -0.0012]) and ties it from 128 patches up. h2o is worse than recency at every budget (+0.013 to +0.033).
@@ -132,7 +132,7 @@ Batch 8 with learning rate 0.001 gives 1.5843 (entropy patching) and 1.6048 (fix
 
 ## Ten times more training (`python scripts/compare_deploy.py scale`, `results/part3/scale_and_tuning.md`)
 
-The main models are small and short-trained (3,000 steps, about 98M bytes), so I trained WikiText code-mix models for 30,000 steps (about 983M bytes, 1.9 epochs of the 526 MB training file; `*_x10` configs, `scripts/run_scale.sh`, `scripts/run_scale2.sh`) with three seeds of entropy patching and one of fixed stride 4, and evaluated them on the same 60 validation documents.
+The main models are small and short-trained (3,000 steps, about 98M bytes), so we trained WikiText code-mix models for 30,000 steps (about 983M bytes, 1.9 epochs of the 526 MB training file; `*_x10` configs, `scripts/campaign/run_scale.sh`, `scripts/campaign/run_scale2.sh`) with three seeds of entropy patching and one of fixed stride 4, and evaluated them on the same 60 validation documents.
 
 | Model | Full-cache BPB | entropy - random at 64 / 128 patches | entropy - recency at 64 | snap - recency at 64 / 128 |
 |---|---|---|---|---|
@@ -160,7 +160,7 @@ So the observation that old patches with high entropy receive less attention hol
 
 ## Test split (`python scripts/compare.py test`, `results/part3/test_split.md`)
 
-WikiText-103 test, 62 documents, evaluated once (`scripts/run_test.sh`) for the 18 WikiText models (entropy patching, fixed strides 4 and 5, three seeds each, with and without code) with the six policies and two budgets fixed on validation beforehand; nothing was tuned on it. TinyStories has no test split in the byte data, so its results are validation only.
+WikiText-103 test, 62 documents, evaluated once (`scripts/campaign/run_test.sh`) for the 18 WikiText models (entropy patching, fixed strides 4 and 5, three seeds each, with and without code) with the six policies and two budgets fixed on validation beforehand; nothing was tuned on it. TinyStories has no test split in the byte data, so its results are validation only.
 - Keeping high-entropy patches is worse than random and than recency in all 36 model and budget cells, with every interval above zero (against random +0.0010 to +0.0124, against recency up to +0.0192).
 - snap beats recency in 33 of 36 cells (the other three are indistinguishable), by 0.0001 to 0.0039 BPB. h2o is worse than recency in all cells.
 - Full-cache test BPB is 0.02 to 0.03 higher than validation for the prose-only entropy models (1.6986, 1.7273, 1.7372 against 1.6801, 1.6994, 1.7080). Entropy patching is below both fixed strides in all three seed pairs for the prose-only models, and in 5 of 6 pairs with the code mix (the exception is seed 2 against stride 4, 1.8435 against 1.8318), the same pattern as on validation.
@@ -216,7 +216,7 @@ A random four-syllable name is introduced early and repeated after 400, 1,200 or
 
 ## Long books: PG-19 (`python scripts/compare_deploy.py pg19`, `results/part3/pg19_stream.md`)
 
-The proposal named PG-19 for long-context cache evaluation. The first 100,000 bytes of each of the first 20 test books (`emozilla/pg19`, a community mirror of the same split, because `deepmind/pg19` ships as a loading script that current `datasets` no longer runs; 100 books, 40.5 MB, split and hash checks pass) were decoded one byte at a time with `BLT.step` and a real fixed-size cache (`scripts/eval_stream.py`, `scripts/run_pg19.sh`, `runs/<model>/stream_pg19_*.json`). Patch positions reach about 22,000, against roughly 900 in the 4,096-byte training chunks. The models are the WikiText code-mix models, so these pre-1919 books are out of domain and BPB is high; 95 percent intervals are bootstrapped over the 20 books and every comparison is paired.
+The proposal named PG-19 for long-context cache evaluation. The first 100,000 bytes of each of the first 20 test books (`emozilla/pg19`, a community mirror of the same split, because `deepmind/pg19` ships as a loading script that current `datasets` no longer runs; 100 books, 40.5 MB, split and hash checks pass) were decoded one byte at a time with `BLT.step` and a real fixed-size cache (`scripts/eval_stream.py`, `scripts/campaign/run_pg19.sh`, `runs/<model>/stream_pg19_*.json`). Patch positions reach about 22,000, against roughly 900 in the 4,096-byte training chunks. The models are the WikiText code-mix models, so these pre-1919 books are out of domain and BPB is high; 95 percent intervals are bootstrapped over the 20 books and every comparison is paired.
 
 | Setting (BPB) | 30,000-step model | 3,000-step model |
 |---|---|---|
@@ -231,9 +231,9 @@ The proposal named PG-19 for long-context cache evaluation. The first 100,000 by
 - Keeping high-entropy patches is the worst policy at every budget: +0.093 to +0.122 against recency for the 30,000-step model and +0.025 to +0.028 for the 3,000-step model, all intervals above zero. Random patches are also worse than recency (+0.068 to +0.081 and +0.004 to +0.006).
 - Caveat: keeping old patches (random or entropy) means attending across distances far beyond the training range, so this experiment cannot separate "entropy is a poor keep signal" from "old patches are hard for this model at these positions". The remedy of renumbering positions inside the cache (as StreamingLLM does) was not tried. SnapKV-style and H2O were not run on PG-19 because `BLT.step` has no attention policies.
 
-## Requeue test (Block 2.0)
+## Requeue test
 
-Verified on the cluster under a single job id. Job 416139 (`configs/requeue_cluster4.json`, 24,000 steps) was sent SIGUSR1 with `scancel --signal=USR1 --batch` while running. It saved a checkpoint at step 1,864, wrote the PREEMPTED marker and was requeued by the batch script (restart count 1). SLURM held it for its restart delay (about 10 minutes), then restarted the same job id; the log printed "resumed at step 1864" and training ran to step 24,000 (final loss 0.1845), with `meta.json` recording both attempts (`ended_step` 1864, then `resumed_from_step` 1864 and `ended_step` 24000, status done). Earlier smoke jobs (407961 and 408216, 7-minute limit) showed the same path across two job ids. Two attempts to repeat the single-id test were not signalled because my signalling script failed (jobs 415084 and 416117 ran straight through), and one earlier attempt reused the old run name `requeue_test`, which overwrote that smoke run's `config.json` (its log and checkpoint were kept; the smoke config is `configs/smoke.json`). The first smoke attempt recorded ending at step 1; I did not find out why. The local test (resume equals uninterrupted) covers equality of the resumed run.
+Verified on the cluster under a single job id. Job 416139 (`configs/ops/requeue_cluster4.json`, 24,000 steps) was sent SIGUSR1 with `scancel --signal=USR1 --batch` while running. It saved a checkpoint at step 1,864, wrote the PREEMPTED marker and was requeued by the batch script (restart count 1). SLURM held it for its restart delay (about 10 minutes), then restarted the same job id; the log printed "resumed at step 1864" and training ran to step 24,000 (final loss 0.1845), with `meta.json` recording both attempts (`ended_step` 1864, then `resumed_from_step` 1864 and `ended_step` 24000, status done). Earlier smoke jobs (407961 and 408216, 7-minute limit) showed the same path across two job ids. Two attempts to repeat the single-id test were not signalled because our signalling script failed (jobs 415084 and 416117 ran straight through), and one earlier attempt reused the old run name `requeue_test`, which overwrote that smoke run's `config.json` (its log and checkpoint were kept; the smoke config is `configs/ops/smoke.json`). The first smoke attempt recorded ending at step 1; we never discovered why. The local test (resume equals uninterrupted) covers equality of the resumed run.
 
 ## Why entropy does not work as a keep signal here
 

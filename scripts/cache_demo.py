@@ -6,7 +6,7 @@ import torch.nn.functional as F
 
 from data_utils import REPO_ROOT
 from eval_blt import GLOBAL_CACHE_BYTES_PER_PATCH, load_blt
-from kvc.cache import Policy, QuantPolicy, mean_cache_entries, patch_entropy_scores, patch_scores, tier_mask, visible_mask
+from kvc.cache import Policy, mean_cache_entries, patch_entropy_scores, patch_scores, visible_mask
 from kvc.patching import doc_entropy_and_nats, patch_flags
 from kvc.quant import entry_bytes
 from models.entropy import BOS, EntropyLM

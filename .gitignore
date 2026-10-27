@@ -49,6 +49,16 @@ report/*.vrb
 !report/slides.pdf
 !report/figures/*.pdf
 
+# Test, lint and coverage caches
+.ruff_cache/
+.mypy_cache/
+.coverage
+htmlcov/
+
+# Logs and scratch files
+*.log
+*.tmp
+
 # Editors, operating systems, agent scratch space
 .DS_Store
 Thumbs.db
@@ -60,3 +70,5 @@ desktop.ini
 .claude/
 node_modules/
 report_kit/
+private/
+notes/

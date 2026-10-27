@@ -27,7 +27,7 @@ def test_config_overrides(tmp_path):
     p.write_text(json.dumps({"lr": 1, "model": {"n_layer": 2}}))
     cfg = load_config(p, ["lr=0.5", "model.n_layer=4", "tag=x"])
     assert cfg == {"lr": 0.5, "model": {"n_layer": 4}, "tag": "x"}
-    assert run_id("configs/smoke.json") == "smoke"
+    assert run_id("configs/ops/smoke.json") == "smoke"
 
 
 def test_runlog_meta(tmp_path):
