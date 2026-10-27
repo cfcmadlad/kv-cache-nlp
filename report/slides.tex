@@ -1,0 +1,178 @@
+\documentclass[aspectratio=169,10pt]{beamer}
+\usepackage[T1]{fontenc}
+\usepackage{lmodern}
+\usepackage{booktabs}
+\usepackage{graphicx}
+\usetheme{default}
+\usecolortheme{seahorse}
+\setbeamertemplate{navigation symbols}{}
+\setbeamertemplate{footline}{\hfill\scriptsize\insertframenumber/\inserttotalframenumber\hspace{2mm}\vspace{1mm}}
+\newcommand{\bpb}{\textsc{bpb}}
+\newcommand{\fig}[2][0.95]{\includegraphics[width=#1\textwidth]{#2}}
+\title{Patch-Aware KV Cache Compression\\for Byte-Level Language Models}
+\subtitle{A controlled study of attention-guided, entropy-guided and recency eviction}
+\author{Group 12: Aditya Rayaprolu, Kshitij Gupta, Dhwaj Kishore, Arnab Hazra, Riyazuddin Khan}
+\institute{CS F429 Natural Language Processing, BITS Pilani Hyderabad Campus}
+\date{Part 3 presentation}
+\begin{document}
+\begin{frame}\titlepage\end{frame}
+
+\begin{frame}{Why this problem}
+\begin{columns}[T]
+\begin{column}{0.42\textwidth}
+\begin{itemize}\setlength{\itemsep}{3pt}
+\item Chat models read BPE tokens; a tokenizer-free model reads raw bytes
+\item Bytes: no unknown words, robust to typos, code, other scripts
+\item Cost: about 4 times more positions, so a 4 times larger KV cache
+\item The KV cache, not the weights, limits batch size and context length
+\item BLT already computes next-byte entropy to place patches: free signal?
+\end{itemize}
+\end{column}
+\begin{column}{0.58\textwidth}\fig{presentation/mermaid/mermaid_01.png}\end{column}
+\end{columns}
+\end{frame}
+
+\begin{frame}{How it relates to the models people use}
+\fig[0.98]{figures/fig_public.pdf}
+\scriptsize Llama 3 8B: 32 layers, 8 KV heads (grouped-query attention to shrink the cache), 128k tokens; Llama 2 7B: 32k BPE vocabulary, 4k context. Ours: 13.3M parameters, trained from scratch on one GPU. We compare cost structure and methods, not chat quality.
+\end{frame}
+
+\begin{frame}{The task and the metric}
+\begin{itemize}\setlength{\itemsep}{4pt}
+\item Task: next-symbol prediction (language modelling), scored in \textbf{bits per byte (\bpb)}
+\item \bpb{} is tokenizer-independent: 4-gram, BPE and byte models on identical documents
+\item Datasets: TinyStories (easy), WikiText-103 (hard, long), The Stack Smol (code mix), PG-19 (books)
+\item Baselines: Kneser-Ney byte 4-gram (classical), BPE Transformer 13.8M (modern)
+\item Evaluation: three seeds, paired bootstrap intervals, WikiText test split used once
+\end{itemize}
+\end{frame}
+
+\begin{frame}{Our system: a small BLT-style model}
+\fig[0.98]{presentation/mermaid/mermaid_02.png}
+\begin{itemize}\setlength{\itemsep}{2pt}\small
+\item 13,333,632 parameters; entropy model 3.3M; one cache entry per patch (9,216 bytes fp16)
+\end{itemize}
+\end{frame}
+
+\begin{frame}{Patches shrink the cache}
+\fig[1.0]{figures/fig_entries.pdf}
+\begin{itemize}\setlength{\itemsep}{3pt}
+\item Patch boundary where the next byte is hard to predict: 67\% of patch starts at word starts (chance 16 to 20\%)
+\item Byte model: one entry per byte. BLT-style: one per patch (4.5 bytes)
+\end{itemize}
+\end{frame}
+
+\begin{frame}{Cache policies compared at equal cache bytes}
+\fig[0.62]{presentation/mermaid/mermaid_03.png}
+\end{frame}
+
+\begin{frame}{Baselines and base models}
+\fig[0.8]{figures/fig_models.pdf}
+\begin{itemize}\setlength{\itemsep}{2pt}\small
+\item Every neural model is far ahead of the 4-gram; at equal training the BPE Transformer is ahead of our BLT
+\item With 10x training the WikiText BLT reaches 1.29 to 1.31 (not like-for-like)
+\end{itemize}
+\end{frame}
+
+\begin{frame}{Seeds matter}
+\fig[0.8]{figures/fig_seeds.pdf}
+\scriptsize Seed spread (0.03 to 0.14 \bpb) is as large as patching gaps: a single-seed 3.3\% claim was retired. Entropy patching is lowest on WikiText in 3 of 3 seed pairs (likely, not established).
+\end{frame}
+
+\begin{frame}{Main test: is entropy a good keep signal?}
+\fig[0.52]{figures/fig_scoreboard.pdf}
+\begin{itemize}\setlength{\itemsep}{2pt}\small
+\item Worse than random in 68 and than recency in 70 of 72 comparisons, better in none
+\item Holds in every seed, fixed-stride models, code mix, 16k context, and the test split (36 of 36)
+\item SnapKV-style (online): better than recency in 24 of 24
+\end{itemize}
+\end{frame}
+
+\begin{frame}{More training makes it worse, not better}
+\fig[0.98]{figures/fig_scale.pdf}
+\scriptsize Penalty against random at 64 patches: +0.002 (3,000 steps) to +0.024 to +0.029 (30,000 steps). SnapKV-style gain grows several times as well.
+\end{frame}
+
+\begin{frame}{Why: what the entropy rule keeps}
+\fig[0.98]{figures/fig_kept.pdf}
+\begin{itemize}\setlength{\itemsep}{2pt}\small
+\item It keeps one- and two-byte fragments (98.0\% and 99.7\% of kept patches) and drops patches with words
+\item Old high-entropy patches also receive less attention in middle and upper layers
+\end{itemize}
+\end{frame}
+
+\begin{frame}{Where the extra loss falls}
+\fig[0.85]{figures/fig_terciles.pdf}
+\scriptsize Keeping high-entropy patches does not protect the high-entropy bytes and also costs the easy ones. The top 1\% of bytes carry 18 to 30\% of the extra loss.
+\end{frame}
+
+\begin{frame}{What works: eviction, quantization, SnapKV-style}
+\fig[0.98]{figures/fig_frontier.pdf}
+\scriptsize WikiText: 128 patches in 4-bit keep 7.4\% of the cache bytes for +0.0012 \bpb{} (SnapKV-style); keeping high entropy never reaches the frontier.
+\end{frame}
+
+\begin{frame}{Bounded-memory streaming}
+\fig[0.98]{figures/fig_stream.pdf}
+\scriptsize A fixed recency cache beats resetting the context in 3 of 3 seeds and on 20 PG-19 books (by 0.0086 \bpb).
+\end{frame}
+
+\begin{frame}{Measured memory and time}
+\fig[0.98]{figures/fig_memory.pdf}
+\scriptsize 0.59 MB against 136.5 MB at 65,536 bytes; 0.9 ms per byte against a rise to 2.0 ms.
+\end{frame}
+
+\begin{frame}{Compute per byte (analytic)}
+\begin{columns}[T]
+\begin{column}{0.62\textwidth}\centering\footnotesize\resizebox{\textwidth}{!}{\input{flops_table}}\end{column}
+\begin{column}{0.38\textwidth}\begin{itemize}\small\setlength{\itemsep}{3pt}
+\item BLT: 2.8x fewer FLOPs than a byte Transformer
+\item But more than BPE (11.1 against 7.4), and the entropy model adds 8.5
+\item Case for the BLT: cache memory
+\end{itemize}\end{column}
+\end{columns}
+\end{frame}
+
+\begin{frame}{Error analysis: generations diverge}
+\footnotesize TinyStories, prompt of 700 bytes, 32 patches (real output, greedy):
+\begin{itemize}\setlength{\itemsep}{3pt}
+\item full: \texttt{find your friends."  Roxy was so happy to help Roxy.}
+\item recency (diverges at byte 17): \texttt{find your friends to climb the leaves."...}
+\item keep high entropy (byte 25): \texttt{...Roxyy said, "Thank you, Billy.}
+\end{itemize}
+Per-byte: \texttt{They argue[d]} costs 0.02 bits with the full cache and 5.97 under entropy eviction. Small models repeat; these are anecdotes of where the compressed cache changes the prediction.
+\end{frame}
+
+\begin{frame}{Challenges and how we handled them}
+\small
+\begin{itemize}\setlength{\itemsep}{3pt}
+\item Seed variance as large as gaps: three seeds, paired bootstrap; a 3.3\% claim retired
+\item Byte-share accounting error found by cross-table check: fixed, all tables regenerated
+\item Under-trained 16k models gave a wrong conclusion: tuned, penalty does not fade
+\item Offline attention scores approximate: online implementation built and tested
+\item Silent OOM corrupted a cache: caught from logs, queue hardened
+\item Gated code data, PG-19 loader, cluster limits: workarounds recorded in \texttt{CHALLENGES.md}
+\end{itemize}
+\end{frame}
+
+\begin{frame}{Live demo (CPU, no GPU needed)}
+\fig[0.95]{presentation/mermaid/mermaid_08.png}
+\small \texttt{python scripts/demo.py} (or \texttt{run.bat}); script and fallbacks in \texttt{docs/demo\_script.md}
+\end{frame}
+
+\begin{frame}{Scope, limits and what is next}
+\begin{itemize}\setlength{\itemsep}{3pt}
+\item 13.3M parameters; the models do not retrieve (planted-name test): retrieval tasks untested
+\item Cache sizes computed except recency; FLOPs analytic; PG-19 confounds entropy with distance
+\item Next: larger models, positions renumbered inside the cache, attention policies in step decoding
+\end{itemize}
+\end{frame}
+
+\begin{frame}{Conclusion}
+\begin{itemize}\setlength{\itemsep}{4pt}
+\item \textbf{New:} controlled test of entropy-ranked cache retention on a byte-level patch model; online attention policies over patch caches; measured bounded-memory streaming
+\item \textbf{Improved:} 7.4\% of the cache for +0.0012 \bpb; SnapKV-style beats recency 24/24; constant memory and time; 2.8x fewer FLOPs than a byte Transformer
+\item \textbf{Did not work:} entropy as the keep signal (68 to 70 of 72 worse), and it grows worse with training
+\item \textbf{Open:} larger models and retrieval
+\end{itemize}
+\end{frame}
+\end{document}

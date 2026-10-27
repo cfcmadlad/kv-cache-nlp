@@ -1,73 +1,57 @@
-# Plan to 12 November 2026
+# A chronicle of the project, and its plan
 
-Written 21 Oct 2026. Official deadline 21 Nov; 12 Nov is our target, the nine days after are buffer. Rubric for Part 3 (30 marks): Novelty 3, Improvement 3, Results and error analysis 2, Challenges 2, Demo and viva 20. A block that maps to none of these is cut first.
+Official deadline for Part 3: 21 November 2026; the team's own target was 12 November, the intervening nine days serving as a cushion against misadventure. The assessment for Part 3 (30 marks) rewards Novelty (3), Improvement (3), Results and error analysis (2), Challenges (2) and Demonstration and viva (20); any block that served none of these was to be cut first.
 
-Phases 0 and 1 are Parts 1 and 2 (done). Phases 3 to 9 below are my outline from the project notes, not a spec you gave me; please correct them.
+## Where matters stand (27 Oct 2026)
 
-## Status on 21 Oct (end of day)
+All experiments are complete and committed. The deliverables are in place: the paper-style report (`report/main.tex`, ten pages with references), a supplement, a 22-slide deck with notes, an error analysis (`docs/error_analysis_part3.md`), an analytic FLOPs table, a demonstration script verified on CPU from a fresh clone, anticipated viva questions, a verified literature survey (`NOVELTY.md`) and the full record of difficulties (`CHALLENGES.md`). What remains is human: rehearse the demonstration on the machine from which it will be given, read the two long documents once more with a cold eye, and read the Scratchpad Patching paper in full.
 
-Done and tested: 2.1 (except the code dataset, which is gated), 2.2, 2.3, 2.4 (four BLT runs, two entropy models, laptop GPU), 2.5 gate table, Phase 3 policies, Phase 4 quantization, an attention mechanism analysis from Phase 7. Numbers: `docs/results_summary.md`. Not done: 2.0 cluster verification, code dataset, three seeds, Phase 8 demo update, report text. The headline result is negative for the entropy rule; see the summary.
+## How the weeks unfolded
 
-## Status on 21 Oct (evening)
+| Date | Event |
+|---|---|
+| 27 Aug | Part 1 proposal submitted |
+| 15 Oct | Part 2 submitted: data pipeline, Kneser-Ney byte 4-gram and BPE Transformer baselines |
+| 21 Oct | Byte datasets, entropy model, BLT-style model, cache policies, quantization; first four BLT runs; the headline result already negative for the entropy rule |
+| 21 Oct (evening) | Seeds, stride-5 control, ablation tooling, the Part 3 demonstration |
+| 21 Oct (night) | Three seeds, controls and ablations on the cluster; code dataset built; code-mix retraining; policy evaluation rerun after an accounting fix |
+| 25 Oct | Online H2O and SnapKV-style; eviction with 4-bit quantization; recency-protected entropy; bounded-memory streaming; measured decoding; planted-name recall; 30,000-step models; 16k tuning; requeue test; PG-19 streaming on 20 books |
+| 26 Oct to 27 Oct | Report, supplement, slides, error analysis, FLOPs, demo rehearsal, verified literature |
 
-Added since: seed 1 and 2 configs and a fixed-stride-5 control (`scripts/run_seeds.sh`; seed 1 of TinyStories entropy done and the sign holds), ablation tooling (`--signal own`, `--agg first|sum`, sink size, byte-level model with stride 1; `scripts/run_ablations.sh`), the Part 3 demo (option 4, `scripts/part3_assets.py`, tested from a clean copy on CPU), `scripts/compare.py seeds` and `scripts/collate_viva.py`. Waiting on the GPU queue: remaining seeds, ablations. Needs the HPC or the user: Block 2.0 verification, code dataset, upload of the `v0.3-part3` release asset (zip built by `part3_assets.py build`, SHA-256 already in the script), Part 1 and 2 gaps. Phase 9 tables and report text come after the runs finish.
+Known gaps, stated without embroidery: positions beyond the training range were not renumbered inside the cache; there is no retrieval conclusion because the models do not retrieve; long TinyStories training overfits; the 16k and fixed-stride 30,000-step models have one seed each.
 
-## Status on 21 Oct (night)
+## The original plan, by phase
 
-Done on the cluster: three seeds, stride-5 control, ablations (own entropy, scoring rules, sink, byte-level), policy evaluation rerun after an accounting fix, code dataset built and verified. Tables: `results/part3/` (`seeds.md`, `ablations.md`, `comparison.md`, `code_domain.md`). Written: `docs/results_summary.md`, `docs/phase_6_ablations.md`, `docs/report_part3.md`, `docs/viva_notes.md` (collated). Phase 8 demo done and tested from a clean copy. Code-mix WikiText models trained and evaluated (`scripts/run_mix.sh`). Open: Block 2.0 requeue test, release asset delivery for the demo, Part 1 and 2 gaps, test split evaluation (once per final configuration), attention analysis on more seeds.
+### Phase 2: byte models
 
-## Status on 25 Oct
+| Block | Done when | Rubric |
+|---|---|---|
+| 2.0 Infrastructure | pytest passes; a smoke job under five minutes writes `meta.json`; a killed job resumes at the saved step | Challenges, Demo |
+| 2.1 Byte datasets | byte counts match `stats.json`; 100 documents round-trip; no duplicate code hashes across splits | Results |
+| 2.2 Entropy model | validation BPB in a plausible range; at least 60 percent of WikiText patch starts at word starts; causality test passes | Novelty |
+| 2.3 BLT-style model | incremental decode equals the full forward within 1e-5; leakage test; parameter count matches a hand calculation | Novelty, Demo |
+| 2.4 Training on the cluster | four BLT runs (two datasets, entropy and fixed stride) plus two entropy models | Results |
+| 2.5 Gate | `scripts/results.py --phase 2` prints the five-row table; the Part 2 rows reproduce exactly | Results |
 
-All planned and optional experiments are done on the cluster. Since 22 Oct: online H2O and SnapKV (patch-by-patch decoding, tested), eviction plus 4-bit quantization, a recency-protected entropy variant, bounded-memory streaming over 16,384-byte chunks, measured decoding on the GPU, ablations on seeds 1 and 2, planted-name recall, 30,000-step WikiText models (three seeds of entropy patching, one of fixed stride), tuning of the 16,384-byte models and a requeue test (verified end to end under one job id). Results: `docs/results_summary.md`; tables in `results/part3/` (`online_policies.md`, `deploy_combo.md`, `stream_16k.md`, `deploy_bench.md`, `deploy_hybrid.md`, `deploy_needle.md`, `ablations_seeds.md`, `scale_and_tuning.md`, `deploy_memory.md`, `long_context.md`); report text `docs/report_part3.md`. The `v0.3-part3` release is published. Open for the user: Part 1 and Part 2 entries in `CHALLENGES.md` (questions at its end), read the report. PG-19 streaming on 20 books is done (`pg19_stream.md`). Known gaps: positions beyond training were not renumbered, no retrieval conclusion (the models do not retrieve), TinyStories long training overfits, one seed for the 16k and fixed-stride 30,000-step models.
+Decision points: if incremental decoding were not green by 25 Oct, fixed stride would become the main model; if entropy patching proved unstable or more than 10 percent worse in loss than fixed stride at equal steps by 26 Oct, likewise. Neither occurred.
 
-## Phase 2: byte models (21 Oct to 31 Oct)
+### Phases 3 to 9
 
-| Block | Dates | Done when | Rubric |
-|---|---|---|---|
-| 2.0 Infrastructure | 21 to 22 Oct | pytest passes; smoke job under 5 min writes meta.json; killed job resumes at saved step | Challenges, Demo |
-| 2.1 Byte datasets | 22 to 23 Oct | byte counts match stats.json; 100 docs round-trip; no duplicate code hashes across splits | Results |
-| 2.2 Entropy model | 23 to 24 Oct | val BPB in plausible range; at least 60 percent of WikiText patch starts at word starts; causality test passes | Novelty |
-| 2.3 BLT-style model | 24 to 25 Oct | incremental decode equals full forward within 1e-5; leakage test; parameter count matches hand calculation | Novelty, Demo |
-| 2.4 Training on HPC | 25 to 30 Oct | four BLT runs (two datasets, entropy and fixed stride) plus two entropy models | Results |
-| 2.5 Gate | 31 Oct | `scripts/results.py --phase 2` prints the five-row table, Part 2 rows reproduce exactly | Results |
+* **3. Cache policies.** A patch-granular cache with byte accounting; full, recency (a sliding window with a sink), random and entropy-ranked eviction under one budget interface.
+* **4. Quantization.** Per-patch precision by entropy against uniform and random precision at matched bytes.
+* **5. Main evaluation.** BPB against cache bytes on TinyStories and WikiText plus code validation, tuned on validation only; three seeds; bootstrap intervals over documents; the test split touched once per final configuration.
+* **6. Ablations.** Own entropy against a separate entropy model; patch against byte-level eviction; sink size; a fixed-stride model under the same policies.
+* **7. Error analysis.** Where eviction hurts: per document, per domain, and which kinds of bytes are evicted.
+* **8. Demonstration.** `scripts/demo.py`, `run.bat` and `run.sh` on a CPU laptop from a clean clone, with new release assets and a full rehearsal.
+* **9. Comparative study and report.** All policies and baselines in one view, a written comparison with related work, the report sections, and viva notes collated from `docs/`.
 
-Decision points: 25 Oct, if 2.3 incremental decoding is not green, fixed stride becomes the main model. 26 Oct, if entropy patching is unstable or more than 10 percent worse in loss than fixed stride at equal steps, fixed stride becomes the main model.
+## Risks, as foreseen
 
-## Phase 3: cache policies (1 to 3 Nov)
+1. Incremental decoding at patch boundaries (see the decision points above).
+2. One GPU job at a time, with queueing behind other users; Phase 2.4 was the long pole.
+3. A crowded calendar; if Phase 2 slipped, quantization would be cut first, then ablations.
+4. The core result might be negative, and the plan did not depend upon a positive one. It was, in the event, negative.
 
-Patch-granular cache with byte accounting (cache bytes per 1000 input bytes). Policies: full, recency (sliding window with sink), random, entropy-ranked patch eviction. Same budget interface for all.
+## Rules we held ourselves to
 
-## Phase 4: quantization (3 to 4 Nov)
-
-Per-patch precision by entropy (high entropy keeps more bits) against uniform and random precision at matched bytes.
-
-## Phase 5: main evaluation (4 to 7 Nov)
-
-BPB against cache bytes curves on TinyStories and WikiText plus code validation, tuned on validation only. Three seeds for the two entropy-patched BLT models. Bootstrap confidence intervals over documents. Test split touched once per final configuration.
-
-## Phase 6: ablations (7 to 8 Nov)
-
-Own-entropy versus separate entropy model signal; patch eviction versus byte-level eviction; sink size; fixed-stride model with the same policies (does the entropy signal matter without entropy patching).
-
-## Phase 7: error analysis (8 to 9 Nov)
-
-Where eviction hurts: per-document gaps, per-domain (prose versus code), what kinds of bytes get evicted.
-
-## Phase 8: demo (9 to 10 Nov)
-
-Extend `scripts/demo.py`, `run.bat`, `run.sh` for CPU laptop from a clean clone after `fetch_assets.py`; new release assets; full rehearsal on a fresh unzip.
-
-## Phase 9: comparative study and report (10 to 12 Nov)
-
-Comparison table of all policies and baselines in one view (cache bytes against BPB, with CIs), written comparison against related work from NOVELTY.md, report sections, viva notes collated from `docs/`.
-
-## Risks
-
-1. 2.3 incremental decoding at patch boundaries (see decision points).
-2. One GPU job at a time (half a GPU, 2-day wall time, queueing from other users). Phase 2.4 is the long pole: six trainings in five days. If queue time is long, drop the second entropy model and reuse the TinyStories one, or cut steps.
-3. Phases 3 to 9 get 11 days with writing included. If Phase 2 slips past 31 Oct, cut Phase 4 (quantization) first, then Phase 6.
-4. The core result may be negative. The plan does not depend on a positive result.
-
-## Rules
-
-Configs not hard-coded values; fixed seeds; every reported number regenerates from one command; tune on validation only; never overwrite `checkpoints/` or Part 2 results; stop and give options if a block passes 1.5 times its estimate.
+Configurations rather than hard-coded values; fixed seeds; every reported number regenerable from a single command; tuning on validation only; no overwriting of `checkpoints/` or the Part 2 results; a pause, with options laid out, whenever a block exceeded one and a half times its estimate.
