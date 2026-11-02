@@ -6,6 +6,7 @@ import torch
 
 from data_utils import REPO_ROOT
 from kvc.bytedata import open_split
+from kvc.cache import Policy, patch_entropy_scores, visible_mask
 from kvc.config import load_config, run_id
 from kvc.patching import patch_flags
 from kvc.runlog import RunLog
@@ -22,6 +23,28 @@ def patch_settings(cfg: dict) -> dict:
     return {"mode": p["mode"], "theta": theta, "max_len": p.get("max_len", 16), "stride": p.get("stride", 4)}
 
 
+def eviction_mask(flags: np.ndarray, rel_doc: np.ndarray, h: np.ndarray, num_patches: int, rng, ev: dict) -> np.ndarray:
+    mask = np.ones((num_patches, num_patches), dtype=bool)
+    if rng.random() < ev.get("p_full", 0.25):
+        return mask
+    cs = np.cumsum(flags)
+    patch_in = cs - flags
+    P = int(cs[-1]) + 1
+    first = np.unique(patch_in, return_index=True)[1]
+    patch_doc = rel_doc[first]
+    ent = patch_entropy_scores(patch_in, h.astype(np.float64), P, "mean")
+    mode = ev["policies"][rng.integers(len(ev["policies"]))]
+    budget = int(ev["budgets"][rng.integers(len(ev["budgets"]))])
+    pol = Policy(mode, budget, ev.get("sink", 1), ev.get("recent", 8))
+    for d in np.unique(patch_doc):
+        idx = np.flatnonzero(patch_doc == d)
+        if len(idx) <= budget:
+            continue
+        scores = {"recency": np.arange(len(idx), dtype=float), "random": rng.random(len(idx)), "entropy": ent[idx]}[mode]
+        mask[np.ix_(idx, idx)] = visible_mask(len(idx), scores, pol)
+    return mask
+
+
 def batcher(data, offsets, entropy, cfg: dict, mix=None):
     n, block, batch, seed = len(data), cfg["block"], cfg["batch_size"], cfg["seed"]
     ps = patch_settings(cfg)
@@ -35,6 +58,7 @@ def batcher(data, offsets, entropy, cfg: dict, mix=None):
         x = np.empty((batch, block), dtype=np.int64)
         y = np.empty((batch, block), dtype=np.int64)
         flags = np.empty((batch, block), dtype=bool)
+        evict = [None] * batch
         for r, p in enumerate(pos):
             src, offs, ent = mix if use[r] else (data, offsets, entropy)
             q = np.arange(p, p + block)
@@ -46,6 +70,15 @@ def batcher(data, offsets, entropy, cfg: dict, mix=None):
             forced[:-1] |= rel[1:] == 0
             h = ent[p:p + block].astype(np.float32) if ent is not None else None
             flags[r] = patch_flags(h, rel, forced, ps["mode"], ps["theta"], ps["max_len"], ps["stride"])
+            if "evict" in cfg:
+                evict[r] = (flags[r], doc, h)
+        if "evict" in cfg:
+            P = int(flags.cumsum(1)[:, -1].max()) + 1
+            keep = np.ones((batch, P, P), dtype=bool)
+            for r, (f, d, h) in enumerate(evict):
+                cnt = int(f.cumsum()[-1]) + 1
+                keep[r, :cnt, :cnt] = eviction_mask(f, d, h, cnt, rng, cfg["evict"])
+            return (torch.from_numpy(x), torch.from_numpy(flags), torch.from_numpy(keep)), torch.from_numpy(y)
         return (torch.from_numpy(x), torch.from_numpy(flags)), torch.from_numpy(y)
     return get
 

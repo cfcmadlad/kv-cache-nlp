@@ -4,7 +4,7 @@ import torch.nn as nn
 import torch.nn.functional as F
 
 from kvc.cache import ATTN_MODES, Policy, QuantPolicy, evict_one, insertion_hi, tier_row
-from kvc.quant import fake_quant
+from kvc.quant import fake_quant, quant_keys, quant_vals
 from models.entropy import BOS, Block
 from models.rope import apply_rope, rope_cache
 
@@ -33,16 +33,30 @@ class GlobalAttention(nn.Module):
             self.record.append(w.detach())
             return self.proj((w @ v).transpose(1, 2).reshape(B, T, C))
         if tier is not None:
-            hi_mask, hb, lb = tier
+            hi_mask, hb, lb, *spec = tier
+            spec = spec[0] if spec else None
             hi = hi_mask[:, None]
             scale = q.size(-1) ** -0.5
-            s = torch.where(hi, q @ fake_quant(k, hb).transpose(-1, -2), q @ fake_quant(k, lb).transpose(-1, -2)) * scale
+            s = torch.where(hi, q @ quant_keys(k, hb, spec).transpose(-1, -2), q @ quant_keys(k, lb, spec).transpose(-1, -2)) * scale
             w = torch.softmax(s.masked_fill(~mask, float("-inf")), -1)
-            out = (w * hi) @ fake_quant(v, hb) + (w * ~hi) @ fake_quant(v, lb)
+            out = (w * hi) @ quant_vals(v, hb, spec) + (w * ~hi) @ quant_vals(v, lb, spec)
             return self.proj(out.transpose(1, 2).reshape(B, T, C))
         return self.proj(F.scaled_dot_product_attention(q, k, v, attn_mask=mask).transpose(1, 2).reshape(B, T, C))
 
-    def step(self, x, cos, sin, cache, keep=None, tier=None):
+    def _step_renumbered(self, x, cache, keep):
+        B, _, C = x.shape
+        q, k, v = self.qkv(x).view(B, 1, 3, self.n_head, C // self.n_head).permute(2, 0, 3, 1, 4)
+        if cache:
+            old_k, old_v = (cache["k"], cache["v"]) if keep is None else (cache["k"][:, :, keep], cache["v"][:, :, keep])
+            k, v = torch.cat([old_k, k], 2), torch.cat([old_v, v], 2)
+        cache["k"], cache["v"] = k, v
+        cos, sin = rope_cache(torch.arange(k.size(2), device=x.device), k.size(-1))
+        out = F.scaled_dot_product_attention(apply_rope(q, cos[-1:], sin[-1:]), apply_rope(k, cos, sin), v)
+        return self.proj(out.transpose(1, 2).reshape(B, 1, C))
+
+    def step(self, x, cos, sin, cache, keep=None, tier=None, renumber=False):
+        if renumber:
+            return self._step_renumbered(x, cache, keep)
         q, k, v = self._qkv(x, cos, sin)
         if cache:
             old_k, old_v = (cache["k"], cache["v"]) if keep is None else (cache["k"][:, :, keep], cache["v"][:, :, keep])
@@ -70,8 +84,8 @@ class GlobalBlock(nn.Module):
         x = x + self.attn(self.ln1(x), cos, sin, doc, keep, tier)
         return x + self.out(F.gelu(self.fc(self.ln2(x))))
 
-    def step(self, x, cos, sin, cache, keep=None, tier=None):
-        x = x + self.attn.step(self.ln1(x), cos, sin, cache, keep, tier)
+    def step(self, x, cos, sin, cache, keep=None, tier=None, renumber=False):
+        x = x + self.attn.step(self.ln1(x), cos, sin, cache, keep, tier, renumber)
         return x + self.out(F.gelu(self.fc(self.ln2(x))))
 
 
@@ -133,8 +147,8 @@ class BLT(nn.Module):
         tier = extra[1] if len(extra) > 1 else None
         e, g, cs, doc, patch_doc, cos, sin = self._local_in(idx, nxt)
         gcos, gsin = rope_cache(torch.arange(g.size(1), device=idx.device), self.global_head_dim)
-        for block in self.glob:
-            g = block(g, gcos, gsin, patch_doc, keep, tier)
+        for i, block in enumerate(self.glob):
+            g = block(g, gcos, gsin, patch_doc, keep[:, i] if keep is not None and keep.dim() == 4 else keep, tier)
         return self._local_out(e, g, cs, doc, cos, sin, targets)
 
     @torch.no_grad()
@@ -170,6 +184,50 @@ class BLT(nn.Module):
                     blk.attn.record = None
                 total += row
                 rows.append(row)
+            out.append(x)
+        return self._local_out(e, torch.cat(out, 1), cs, doc, cos, sin, None)
+
+    @torch.no_grad()
+    def forward_merge(self, inputs, budget: int, mode: str, margins: np.ndarray, lengths: np.ndarray, sink: int = 1, recent: int = 8, rng=None):
+        idx, nxt = inputs
+        e, g, cs, doc, _, cos, sin = self._local_in(idx, nxt)
+        P = g.size(1)
+        caches = [{} for _ in self.glob]
+        meta_len, meta_margin = [], []
+        out = []
+        for p in range(P):
+            gcos, gsin = rope_cache(torch.tensor([p], device=idx.device), self.global_head_dim)
+            while len(meta_len) >= budget:
+                allowed = np.arange(sink, len(meta_len) - recent)
+                if len(allowed) == 0:
+                    raise ValueError(f"budget {budget} too small for sink {sink} and recent {recent}")
+                if mode == "evict":
+                    drop = int(allowed[0])
+                    keep = torch.tensor(np.delete(np.arange(len(meta_len)), drop), device=idx.device)
+                    for cache in caches:
+                        cache["k"], cache["v"] = cache["k"][:, :, keep], cache["v"][:, :, keep]
+                    del meta_len[drop], meta_margin[drop]
+                    continue
+                pair = allowed[:-1] if len(allowed) > 1 else allowed
+                if mode == "weak":
+                    i = int(pair[np.argmin([meta_margin[j + 1] for j in pair])])
+                elif mode == "random":
+                    i = int(pair[rng.integers(len(pair))])
+                else:
+                    i = int(pair[0])
+                wa, wb = float(meta_len[i]), float(meta_len[i + 1])
+                for cache in caches:
+                    for name in ("k", "v"):
+                        t = cache[name]
+                        merged = (wa * t[:, :, i] + wb * t[:, :, i + 1]) / (wa + wb)
+                        cache[name] = torch.cat([t[:, :, :i], merged[:, :, None], t[:, :, i + 2:]], 2)
+                meta_len[i] += meta_len[i + 1]
+                del meta_len[i + 1], meta_margin[i + 1]
+            x = g[:, p:p + 1]
+            for blk, cache in zip(self.glob, caches):
+                x = blk.step(x, gcos, gsin, cache, None)
+            meta_len.append(float(lengths[p]))
+            meta_margin.append(float(margins[p]))
             out.append(x)
         return self._local_out(e, torch.cat(out, 1), cs, doc, cos, sin, None)
 
@@ -217,7 +275,7 @@ class BLT(nn.Module):
                 row = tier_row(qpolicy, np.arange(pid + 1), state["flags"], pid)
                 tier = (torch.from_numpy(row).to(token.device), qpolicy.hi_bits, qpolicy.lo_bits)
             for block, cache in zip(self.glob, state["glob"]):
-                g = block.step(g, gcos, gsin, cache, keep, tier)
+                g = block.step(g, gcos, gsin, cache, keep, tier, state.get("renumber", False))
             state["ids"] = ids
             state["h_sum"], state["h_max"] = 0.0, 0.0
             state["prev"] = self.ln_g(g)

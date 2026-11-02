@@ -118,3 +118,51 @@ def test_online_attention_policies_are_causal_and_full_at_large_budget():
         b = online_logits(m, other, nxt, pol)
         assert torch.allclose(a[:, :80], b[:, :80], atol=1e-4)
         assert not torch.allclose(a, full, atol=1e-4)
+
+
+def test_forward_merge_evict_matches_recency_mask_and_merging_shrinks_cache():
+    import numpy as np
+    from kvc.cache import Policy, visible_mask
+    torch.manual_seed(0)
+    model = BLT(**SMALL).eval()
+    n = 120
+    x = torch.randint(97, 123, (1, n))
+    flags = torch.zeros(1, n, dtype=torch.bool)
+    flags[0, ::3] = True
+    P = int(flags.long().sum()) + 1
+    lengths = np.bincount(np.cumsum(flags[0].numpy()) - flags[0].numpy(), minlength=P)
+    margins = np.random.default_rng(0).random(P)
+    pol = Policy("recency", 12, 1, 4)
+    mask = torch.from_numpy(visible_mask(P, np.arange(P, dtype=float), pol))[None]
+    with torch.no_grad():
+        ref = model((x, flags, mask))[0]
+    ev = model.forward_merge((x, flags), 12, "evict", margins, lengths, 1, 4)[0]
+    assert torch.allclose(ref, ev, atol=1e-4)
+    for mode in ("weak", "random", "fixed"):
+        out = model.forward_merge((x, flags), 12, mode, margins, lengths, 1, 4, np.random.default_rng(1))[0]
+        assert out.shape == ref.shape and torch.isfinite(out).all()
+        assert not torch.allclose(out, ev, atol=1e-4)
+
+
+def test_per_layer_keep_masks_match_shared_mask_when_equal():
+    import numpy as np
+    from kvc.cache import Policy, visible_mask
+    torch.manual_seed(0)
+    model = BLT(**SMALL).eval()
+    x = torch.randint(97, 123, (1, 90))
+    flags = torch.zeros(1, 90, dtype=torch.bool)
+    flags[0, ::3] = True
+    P = int(flags.long().sum()) + 1
+    mask = torch.from_numpy(visible_mask(P, np.arange(P, dtype=float), Policy("recency", 10, 1, 4)))[None]
+    with torch.no_grad():
+        shared = model((x, flags, mask))[0]
+        layered = model((x, flags, mask[:, None].expand(-1, len(model.glob), -1, -1)))[0]
+        smaller = model((x, flags, torch.stack([mask[0], visible_mask_t(P, 6)])[None]))[0]
+    assert torch.allclose(shared, layered, atol=1e-5)
+    assert not torch.allclose(shared, smaller, atol=1e-5)
+
+
+def visible_mask_t(P, budget):
+    import numpy as np
+    from kvc.cache import Policy, visible_mask
+    return torch.from_numpy(visible_mask(P, np.arange(P, dtype=float), Policy("recency", budget, 1, 4)))

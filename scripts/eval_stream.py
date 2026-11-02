@@ -15,9 +15,10 @@ from train_blt import patch_settings
 
 
 @torch.no_grad()
-def stream_nats(model, tokens, targets, flags, h, policy, device, state=None):
+def stream_nats(model, tokens, targets, flags, h, policy, device, state=None, renumber=False):
     state = {} if state is None else state
     state.update(model.init_state())
+    state["renumber"] = renumber
     total = 0.0
     for i in range(len(tokens)):
         logits = model.step(state, tokens[i:i + 1], bool(flags[i]), float(h[i]), policy)
@@ -51,6 +52,7 @@ def main():
     p.add_argument("--sink", type=int, default=1)
     p.add_argument("--recent", type=int, default=8)
     p.add_argument("--reset-block", type=int, default=4096)
+    p.add_argument("--renumber", action="store_true")
     p.add_argument("--out", default=None)
     args = p.parse_args()
     device = "cuda" if torch.cuda.is_available() else "cpu"
@@ -76,7 +78,7 @@ def main():
         for m in args.policies:
             for b in args.budgets:
                 pol = Policy(m, b, args.sink, args.recent, "mean", 0)
-                nats[f"{m}|{b}"].append(stream_nats(model, tokens, targets, flags, h, pol, device))
+                nats[f"{m}|{b}"].append(stream_nats(model, tokens, targets, flags, h, pol, device, None, args.renumber))
         print(i, n, {v: round(nats[v][-1] / np.log(2) / n, 4) for v in variants}, flush=True)
     result = {"run": args.run, "dataset": args.dataset, "split": args.split, "books": books, "bytes_per_doc": sizes,
               "settings": {"max_bytes": args.max_bytes, "sink": args.sink, "recent": args.recent, "reset_block": args.reset_block},

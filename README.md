@@ -148,6 +148,10 @@ python scripts/compare_deploy.py ablseeds --out results/part3/ablations_seeds.md
 python scripts/compare_deploy.py scale --out results/part3/scale_and_tuning.md
 python scripts/compare_deploy.py memory --out results/part3/deploy_memory.md
 python scripts/compare_deploy.py pg19 --out results/part3/pg19_stream.md
+python scripts/compare_eat.py --out results/part3/eviction_aware_training.md
+python scripts/compare_eat.py --split test --out results/part3/eviction_aware_training_test.md
+python scripts/compare_kivi.py --out results/part3/kivi.md
+python scripts/compare_pyramid.py --out results/part3/pyramid.md
 ```
 
 ## Analyses, figures and documents

@@ -43,3 +43,11 @@ def test_reset_blocks_equal_full_when_one_block():
         f[0, ::4] = True
         ref = F.cross_entropy(model((tokens[None], f))[0][0], targets, reduction="sum").item()
     assert abs(one - ref) < 1e-2
+
+
+def test_renumbered_positions_match_without_eviction_and_differ_with_it():
+    model, doc, h, flags, tokens, targets = setup()
+    plain = stream_nats(model, tokens, targets, flags, h, None, "cpu")
+    assert abs(stream_nats(model, tokens, targets, flags, h, None, "cpu", None, True) - plain) < 1e-2
+    pol = Policy("recency", 12, 1, 4)
+    assert abs(stream_nats(model, tokens, targets, flags, h, pol, "cpu", None, True) - stream_nats(model, tokens, targets, flags, h, pol, "cpu")) > 1e-4

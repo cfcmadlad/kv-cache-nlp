@@ -70,3 +70,17 @@ def test_entropy_tier_prefers_high_entropy_patches():
     qp = QuantPolicy("entropy", frac=0.1, sink=1)
     mask = tier_mask(qp, 40, scores, np.random.default_rng(0))
     assert mask[-1, 10] and mask[-1, 25] and mask[-1].sum() <= 8
+
+
+def test_kivi_key_quantization_is_per_channel_and_exact_at_high_precision():
+    import torch
+    from kvc.quant import asym_quant, kivi_keys
+    torch.manual_seed(0)
+    k = torch.randn(1, 2, 32, 8) * torch.tensor([1.0, 1.0, 1.0, 20.0, 1.0, 1.0, 1.0, 1.0])
+    assert (kivi_keys(k, 8, 16) - k).abs().max() < 0.2
+    normal = [c for c in range(8) if c != 3]
+    per_channel = (kivi_keys(k, 2, 16) - k)[..., normal].pow(2).mean()
+    per_token = (asym_quant(k, 2, -1) - k)[..., normal].pow(2).mean()
+    assert per_channel < per_token
+    assert kivi_keys(k, 4, 16).shape == k.shape
+    assert kivi_keys(k[:, :, :30], 4, 16).shape == (1, 2, 30, 8)
